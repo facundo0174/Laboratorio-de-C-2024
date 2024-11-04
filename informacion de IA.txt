@@ -398,3 +398,29 @@ Si prefieres una solución más simple, también puedes considerar el uso de pri
 
 ¡Espero que estas sugerencias te ayuden a desarrollar visualmente tu proyecto! Si necesitas más detalles o ejemplos 
 específicos, estaré encantado de ayudarte. ¡Sigue creando!
+
+----------------------------------------------------------------------------------
+FUNCINAMIENTO DE ALGUNAS FUNCIONES VITALES EN SDL 2.
+
+Resumen del Funcionamiento:
+SDL_RenderClear(renderer):
+
+Limpieza del Lienzo: Esta función efectivamente "limpia" el área del renderer, llenándola con el color que has establecido previamente 
+(por ejemplo, azul en tu caso).
+Impacto en Figuras: Si habías dibujado figuras en el renderer, todas ellas se eliminarán del lienzo en esta llamada. 
+Sin embargo, este cambio no es visible para el usuario en la pantalla hasta que llames a SDL_RenderPresent.
+
+SDL_RenderPresent(renderer):
+
+Actualización Visible: Esta función toma el contenido del renderer (que ahora contiene el nuevo fondo establecido por SDL_RenderClear) 
+y lo presenta en la ventana. Es en este momento cuando el usuario puede ver los cambios que has realizado.
+Ciclo de Dibujo: Es común ver estas funciones en un ciclo de juego o en la actualización de la interfaz, donde primero limpias el renderer,
+ dibujas nuevos elementos y luego los presentas.
+ 
+Flujo General:
+Así que el flujo general que sigues es:
+
+Limpiar el renderer (con el color de fondo).
+Dibujar las nuevas figuras o elementos.
+Presentar esos elementos en la ventana para que sean visibles para el usuario.
+Este patrón se repite en cada ciclo de actualización de tu aplicación SDL, permitiendo crear animaciones y actualizaciones de la interfaz de manera eficiente.
