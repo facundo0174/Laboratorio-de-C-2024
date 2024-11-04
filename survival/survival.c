@@ -52,26 +52,70 @@ int main(int argc, char *argv[]) {
     SDL_RenderPresent(renderer); // Mostrar en pantalla LOS CAMBIOS NO VISIBLES
     
     SDL_Rect rectangulo = {0, 100, 1280, 400}; // realiza un rectangulo relleno, paramentros = (coordenadas x, coordenads y, largo, alto)
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);//este color se APLICARA a EL SIGUIENTE DIBUJO, si no aparece nada se aplica al FONDO o VENTANA
-    SDL_RenderFillRect(renderer, &rectangulo);// crea el dibujo RECTANGULO RELLENO, dentro de renderer con la direccion de rectangulo PERO AUN NO ES VISIBLE
-    SDL_RenderPresent(renderer);//HACE VISIBLE LOS CAMBIOS ANTERIORES
-  
+    //SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);//este color se APLICARA a EL SIGUIENTE DIBUJO, si no aparece nada se aplica al FONDO o VENTANA
+    //SDL_RenderFillRect(renderer, &rectangulo);// crea el dibujo RECTANGULO RELLENO, dentro de renderer con la direccion de rectangulo PERO AUN NO ES VISIBLE
+    //SDL_RenderPresent(renderer);//HACE VISIBLE LOS CAMBIOS ANTERIORES
+  	
+  	SDL_Rect jugador = {640, 300, 20, 20};
+  	//SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+  	//SDL_RenderFillRect(renderer, &jugador);
+  	//SDL_RenderPresent(renderer);
 
    // Bucle de eventos para mantener la ventana abierta
    
     int running = 1; //variable identificatoria para realizar bucle de muestreo/actualizacion hasta que el usuario intervenga
     SDL_Event evento;//asigno un nombre a los tipos de eventos que reacciona SDL_event, alli pararían todos los eventos por raton o teclado recolectados
+    // los eventos pueden ser de raton, teclado o joystick, todos tienen palabras reservadas down y up, referenciando la accion de apretar y soltar respectivamente
+    // se debe configurar ambos de lo contrario la accion se volvera perpetua
+   int velocidad = 5; //velocidad traducida en 5 pixeles por bucle segun x accion de desplazamiento en cada eje
+   
+   
     while (running) {
         // Procesar eventos
         // SDL_PollEvent es algo asi como un CACHE de eventos captados por la "ventana" renderizada por SDL
         
         while (SDL_PollEvent(&evento)) {
-            if (evento.type == SDL_QUIT) { // Evento de cierre
+        	//recorre la cola de eventos y realiza opciones segun corresponda
+        	if (evento.type == SDL_QUIT) {
                 running = 0;
+            } else if (evento.type == SDL_KEYDOWN) {
+                switch (evento.key.keysym.sym) {
+                    case SDLK_w: // Movimiento hacia arriba
+                        if (jugador.y - velocidad >= rectangulo.y) jugador.y -= velocidad;
+                        break;
+                    case SDLK_s: // Movimiento hacia abajo
+                        if (jugador.y + jugador.h + velocidad <= rectangulo.y + rectangulo.h) jugador.y += velocidad;
+                        break;
+                    case SDLK_a: // Movimiento hacia la izquierda
+                        if (jugador.x - velocidad >= rectangulo.x) jugador.x -= velocidad;
+                        break;
+                    case SDLK_d: // Movimiento hacia la derecha
+                        if (jugador.x + jugador.w + velocidad <= rectangulo.x + rectangulo.w) jugador.x += velocidad;
+                        break;
+                }
             }
         }
+           
+           // Limpiar la pantalla
+        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Fondo azul de la ventana principal
+        SDL_RenderClear(renderer);
+
+        // Dibujar el rectángulo límite
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // fondo negro del "puente"
+        SDL_RenderFillRect(renderer, &rectangulo);
+
+        // Dibujar el cuadrado en su posición actual
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // verde para el jugador
+        SDL_RenderFillRect(renderer, &jugador);
+
+        // Actualizar la pantalla
+        SDL_RenderPresent(renderer);
+
+        SDL_Delay(16); // Para limitar el uso de CPU (aprox. 60 FPS)
+           
+        }
     
-	}
+	
 
 
 

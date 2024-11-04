@@ -424,3 +424,74 @@ Limpiar el renderer (con el color de fondo).
 Dibujar las nuevas figuras o elementos.
 Presentar esos elementos en la ventana para que sean visibles para el usuario.
 Este patrón se repite en cada ciclo de actualización de tu aplicación SDL, permitiendo crear animaciones y actualizaciones de la interfaz de manera eficiente.
+
+-------------------------------------------------------------------------------------------------------
+EVENTOS CON PERIFERIA EN SDL
+SDL2 maneja los eventos de teclado y otras entradas periféricas (como el mouse y el joystick) a través de una estructura de eventos llamada SDL_Event. 
+Los eventos se procesan en un ciclo de eventos, donde se utiliza una función como SDL_PollEvent o SDL_WaitEvent para capturar cada evento en la cola y luego 
+determinar su tipo para manejarlo apropiadamente.
+
+Aquí te explico cómo SDL maneja los eventos de teclado y otros dispositivos de entrada:
+
+1. Estructura SDL_Event
+SDL_Event es una estructura que almacena diferentes tipos de eventos, incluyendo eventos de teclado, mouse, y joystick. 
+Cada evento se clasifica por un campo llamado type, que define el tipo de evento que se produjo (por ejemplo, SDL_KEYDOWN para una tecla presionada 
+o SDL_MOUSEBUTTONDOWN para un clic del mouse).
+
+2. Ciclo de eventos
+Para procesar eventos, se suele implementar un ciclo que sigue ejecutándose mientras el programa está en ejecución. La función más común para obtener 
+los eventos es SDL_PollEvent, que devuelve 1 si hay eventos pendientes y 0 si no. A cada iteración, el programa revisa el tipo de evento y ejecuta 
+la acción correspondiente.
+
+
+SDL_Event event;
+int running = 1;
+
+while (running) {
+    // Revisa todos los eventos en la cola
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+            case SDL_QUIT:
+                running = 0;  // Evento de cerrar la ventana
+                break;
+            case SDL_KEYDOWN:  // Una tecla fue presionada
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    running = 0;  // Salir si se presiona Escape
+                }
+                break;
+            case SDL_MOUSEBUTTONDOWN:  // El botón del mouse fue presionado
+                // Acción para clic del mouse
+                break;
+            // Otros eventos (joystick, controladores, etc.)
+        }
+    }
+
+    // Lógica y renderización del juego aquí
+}
+
+3. Eventos de teclado
+
+SDL2 tiene eventos específicos para el teclado:
+
+SDL_KEYDOWN: cuando una tecla se presiona.
+SDL_KEYUP: cuando una tecla se libera.
+Cada uno de estos eventos proporciona información adicional en event.key, como:
+
+event.key.keysym.sym: la tecla específica (por ejemplo, SDLK_LEFT para la flecha izquierda).
+event.key.keysym.mod: el modificador (por ejemplo, si Shift o Ctrl están presionados junto con otra tecla).
+4. Eventos de mouse
+SDL también maneja eventos del mouse, como:
+
+SDL_MOUSEBUTTONDOWN y SDL_MOUSEBUTTONUP: para clics.
+SDL_MOUSEMOTION: cuando el mouse se mueve.
+Para estos eventos, se pueden obtener las coordenadas del cursor o saber qué botón se presionó (izquierdo, derecho, etc.) 
+a través de los campos event.button.x, event.button.y, y event.button.button.
+
+5. Otros periféricos
+SDL2 también permite manejar otros dispositivos como joysticks o gamepads usando eventos como SDL_JOYAXISMOTION para el movimiento de un joystick 
+o SDL_CONTROLLERBUTTONDOWN para botones de controladores de juego.
+
+Conclusión
+SDL2 ofrece un sistema bastante completo y eficiente para capturar y manejar eventos de teclado y otros dispositivos de entrada, 
+permitiendo un control adecuado sobre la interacción del usuario en tiempo real. Usar SDL_PollEvent en un ciclo de eventos facilita la 
+gestión de estos dispositivos y es fundamental para cualquier aplicación o juego interactivo en SDL2.
