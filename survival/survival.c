@@ -1,5 +1,6 @@
 #include <SDL.h>
 #include <stdio.h>
+#include <SDL_image.h>
 // la mayoria de datos SDL, se reprecentan de la siguiente manera:
 // SDL_tipoDeDatoVariable *nombreReprecentativo = FuncionReservada (parametros) 
 // algunas veces el igual no hace falta, por ejemplo los casos de eventos, ya que solo necesitamos tener/nombrar una variable para acceder a ellos ya que
@@ -7,7 +8,17 @@
 // * es para declarar punteros o acceder a ellos, mientras que & es para apuntar a la direccion de memoria, en si por ejemplo *p y &p son distintos, 
 // *p sera el contenido o la definicion del puntero, y &p sera la direccion de memoria del puntero, usualmente en hexadesimal
 // si realizas *p = 10, el 10 sera la direccion de memoria en hex, no un valor numerico normalmente tratable, si realizas x = *p, x tendra el contenido de la dir 10
+typedef struct {
+    int x, y;               // Posición del disparo
+    int ancho, alto;        // Tamaño del disparo
+    int activo;             // Si el disparo está en pantalla
+    int direccion_x, direccion_y; // Dirección de movimiento
+} Disparo;
+
+#define MAX_DISPAROS 10
+
 int main(int argc, char *argv[]) {
+	
     // Inicializar SDL
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("No se pudo inicializar SDL: %s\n", SDL_GetError());
@@ -18,11 +29,7 @@ int main(int argc, char *argv[]) {
     //los parametros de createwindow son (nombre de ventana, posicion x, posicion y, ancho de ventana, alto de ventana, mostrar al crear)
     // asigno al tipo de variable SDL visual que reprecenta una ventana, bajo el nombre ventana
     
-    SDL_Window *ventana = SDL_CreateWindow("Survival",
-                                          SDL_WINDOWPOS_CENTERED,
-                                          SDL_WINDOWPOS_CENTERED,
-                                          1280, 600,
-                                          SDL_WINDOW_SHOWN);
+    SDL_Window *ventana = SDL_CreateWindow("Survival",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,1280, 600,SDL_WINDOW_SHOWN);
     //tratamiento de exepcion
 	if (!ventana){
         printf("No se pudo crear la ventana: %s\n", SDL_GetError());
@@ -57,9 +64,15 @@ int main(int argc, char *argv[]) {
     //SDL_RenderPresent(renderer);//HACE VISIBLE LOS CAMBIOS ANTERIORES
   	
   	SDL_Rect jugador = {640, 300, 20, 20};
-  	//SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-  	//SDL_RenderFillRect(renderer, &jugador);
-  	//SDL_RenderPresent(renderer);
+	 // Inicializar los disparos
+    Disparo disparos[MAX_DISPAROS];
+    int i= 0;
+    for ( i = 0; i < MAX_DISPAROS; i++) {
+        disparos[i].activo = 0;
+    }
+     // Variables para el cooldown de disparo
+    Uint32 ultimo_disparo = 0;
+    Uint32 cooldown = 500; // 500 milisegundos
 
    // Bucle de eventos para mantener la ventana abierta
    
@@ -68,7 +81,9 @@ int main(int argc, char *argv[]) {
     // los eventos pueden ser de raton, teclado o joystick, todos tienen palabras reservadas down y up, referenciando la accion de apretar y soltar respectivamente
     // se debe configurar ambos de lo contrario la accion se volvera perpetua
    int velocidad = 5; //velocidad traducida en 5 pixeles por bucle segun x accion de desplazamiento en cada eje
-   
+   int ultima_direccion_x = 1;
+   int ultima_direccion_y = 0;
+   Disparo disparo = {0, 0, 6, 2, 0, 0, 0}; // inicializamos la entidad disparo desactivada, los parametros son correspondientes y posicionales al struct
    
     while (running) {
         // Procesar eventos
@@ -81,17 +96,66 @@ int main(int argc, char *argv[]) {
             } else if (evento.type == SDL_KEYDOWN) {
                 switch (evento.key.keysym.sym) {
                     case SDLK_w: // Movimiento hacia arriba
-                        if (jugador.y - velocidad >= rectangulo.y) jugador.y -= velocidad;
-                        break;
+                        if (jugador.y - velocidad >= rectangulo.y){
+						 	jugador.y -= velocidad;
+						 	ultima_direccion_x = 0; 
+                        	ultima_direccion_y = -1;
+                        }
+						break;
                     case SDLK_s: // Movimiento hacia abajo
-                        if (jugador.y + jugador.h + velocidad <= rectangulo.y + rectangulo.h) jugador.y += velocidad;
+                        if (jugador.y + jugador.h + velocidad <= rectangulo.y + rectangulo.h){
+                        	jugador.y += velocidad;
+                        	ultima_direccion_x = 0; 
+                            ultima_direccion_y = 1;
+						} 
                         break;
                     case SDLK_a: // Movimiento hacia la izquierda
-                        if (jugador.x - velocidad >= rectangulo.x) jugador.x -= velocidad;
-                        break;
+                        if (jugador.x - velocidad >= rectangulo.x){
+                        	 jugador.x -= velocidad;
+                        	 ultima_direccion_x = -1; 
+                             ultima_direccion_y = 0;
+                    }
+						break;
                     case SDLK_d: // Movimiento hacia la derecha
-                        if (jugador.x + jugador.w + velocidad <= rectangulo.x + rectangulo.w) jugador.x += velocidad;
+                        if (jugador.x + jugador.w + velocidad <= rectangulo.x + rectangulo.w){
+							jugador.x += velocidad;
+							ultima_direccion_x = 1; 
+                            ultima_direccion_y = 0;
+                        }
                         break;
+                    case SDLK_j:{// disparo con la letra "j"
+                            Uint32 tiempo_actual = SDL_GetTicks();
+                            if (tiempo_actual > ultimo_disparo + cooldown) {
+                                for (i = 0; i < MAX_DISPAROS; i++) {
+                                    if (!disparos[i].activo) { // Encontrar un disparo inactivo
+                                        disparos[i].activo = 1;
+                                        disparos[i].x = jugador.x + jugador.w / 2 - 3; // Centrar el disparo
+                                        disparos[i].y = jugador.y + jugador.h / 2 - 1;
+                                        disparos[i].ancho = 6;
+                                        disparos[i].alto = 2;
+                                        disparos[i].direccion_x = ultima_direccion_x;
+                                        disparos[i].direccion_y = ultima_direccion_y;
+                                        ultimo_disparo = tiempo_actual;
+                                        break; // Solo un disparo por pulsación
+                                    }
+                                }
+                            }
+                        }
+                    	break;
+                }
+            }
+        }
+        // Mover/actualizar el disparo si está activo
+        for (i = 0; i < MAX_DISPAROS; i++) {
+            if (disparos[i].activo) {
+                int velocidad_disparo = 10;
+                disparos[i].x += disparos[i].direccion_x * velocidad_disparo;
+                disparos[i].y += disparos[i].direccion_y * velocidad_disparo;
+
+                // Si el disparo sale de los límites del rectángulo, desactivarlo
+                if (disparos[i].x < rectangulo.x || disparos[i].x > rectangulo.x + rectangulo.w ||
+                    disparos[i].y < rectangulo.y || disparos[i].y > rectangulo.y + rectangulo.h) {
+                    disparos[i].activo = 0;
                 }
             }
         }
@@ -107,17 +171,24 @@ int main(int argc, char *argv[]) {
         // Dibujar el cuadrado en su posición actual
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // verde para el jugador
         SDL_RenderFillRect(renderer, &jugador);
+        
+        // Dibujar los disparos
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Rojo para los disparos
+        for ( i = 0; i < MAX_DISPAROS; i++) {
+            if (disparos[i].activo) {
+                SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
+                SDL_RenderFillRect(renderer, &rect_disparo);
+            }
+        }
 
         // Actualizar la pantalla
         SDL_RenderPresent(renderer);
 
         SDL_Delay(16); // Para limitar el uso de CPU (aprox. 60 FPS)
+        
+        
+	}
            
-        }
-    
-	
-
-
 
     // Limpiar y cerrar SDL
     SDL_DestroyRenderer(renderer);
