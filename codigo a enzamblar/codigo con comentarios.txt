@@ -1,0 +1,277 @@
+#include <SDL.h>
+#include <stdio.h>
+#include <SDL_image.h>
+
+// Definición de estructuras para representar enemigos y disparos en el juego
+typedef struct {
+    int x, y;                    // Posición
+    int ancho, alto;             // Tamaño
+    int activo;                  // Estado activo/inactivo
+    int velocidad_x;             // Velocidad horizontal
+    int frameActual;             // Frame actual de la animación
+    int tiempoFrame;             // Duración de cada frame en ms
+    Uint32 tiempoAnterior;       // Marca de tiempo del último frame
+    Uint32 tiempoReaparicion;    // Tiempo de reaparición después de ser desactivado
+} Enemigo1;
+
+typedef struct {
+    int x, y;                    // Posición
+    int ancho, alto;             // Tamaño
+    int activo;                  // Estado activo/inactivo
+    int velocidad_x;             // Velocidad horizontal
+    int frameActual;             // Frame actual de la animación
+    int tiempoFrame;             // Duración de cada frame en ms
+    Uint32 tiempoAnterior;       // Marca de tiempo del último frame
+    Uint32 tiempoReaparicion;    // Tiempo de reaparición después de ser desactivado
+} Enemigo2;
+
+Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
+Uint32 cooldownAtaqueEnemigo2 = 750; // Tiempo entre ataques del enemigo 2
+int atacandoEnemigo2 = 0;            // Estado de ataque del enemigo 2
+
+// Estructura para representar disparos
+typedef struct {
+    int x, y;                    // Posición
+    int ancho, alto;             // Tamaño
+    int activo;                  // Estado activo/inactivo
+    int direccion_x;             // Dirección de movimiento (1: derecha, -1: izquierda)
+} Disparo;
+
+// Constantes para controlar las animaciones, velocidad y dimensiones de los sprites
+#define FRAMES_PROYECTIL_ENEMIGO2 6
+#define FRAMES_ATAQUE_ENEMIGO2 4
+#define VELOCIDAD_PROYECTIL_ENEMIGO2 8
+#define LIMITE_ATAQUE_X 0.4 // Límite de ataque como porcentaje de ancho de la pantalla
+#define MAX_DISPAROS 10
+#define ANCHO_FRAME 32
+#define ALTO_FRAME 32
+#define FRAMES_REPOSO 4
+#define FRAMES_CAMINAR 4
+#define FRAMES_DISPARO 4
+#define FRAMES_ENEMIGO1 4
+#define FRAMES_ENEMIGO2 3
+#define VELOCIDAD_DISPARO 10
+#define TIEMPO_REAPARICION_ENEMIGO 2000 // Tiempo de reaparición del enemigo en ms
+
+Disparo disparosEnemigo2[MAX_DISPAROS]; // Array de disparos para el enemigo 2
+
+// Enumeración para controlar el tipo de animación
+typedef enum {
+    REPOSO,
+    CAMINAR,
+    DISPARO,
+    ENEMIGO1_ANIMACION,
+    ENEMIGO2_ANIMACION
+} Animacion;
+
+// Tiempos para la duración de cada tipo de animación
+int tiempoFrameReposo = 150;
+int tiempoFrameCaminar = 400;
+
+// Función para detectar colisiones entre dos rectángulos
+int detectarColision(SDL_Rect a, SDL_Rect b) {
+    return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
+}
+
+int main(int argc, char *argv[]) {
+    // Inicialización de SDL y SDL_image
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("No se pudo inicializar SDL: %s\n", SDL_GetError());
+        return 1;
+    }
+    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
+        printf("No se pudo inicializar SDL_image: %s\n", IMG_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    // Crear ventana y renderer
+    SDL_Window *ventana = SDL_CreateWindow("Survival", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, SDL_WINDOW_SHOWN);
+    if (!ventana) {
+        printf("No se pudo crear la ventana: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        printf("No se pudo crear el renderer: %s\n", SDL_GetError());
+        SDL_DestroyWindow(ventana);
+        SDL_Quit();
+        return 1;
+    }
+
+    // Cargar texturas de los personajes, enemigos y proyectiles
+    SDL_Texture *jugadorTextura = IMG_LoadTexture(renderer, "imagenes/personaje2.png");
+    SDL_Texture *enemigo1Textura = IMG_LoadTexture(renderer, "imagenes/enemigo1.png");
+    SDL_Texture *enemigo2Textura = IMG_LoadTexture(renderer, "imagenes/enemigo2.png");
+    SDL_Texture *proyectilEnemigo2Textura = IMG_LoadTexture(renderer, "imagenes/proyectilEnemigo2.png");
+    SDL_Texture *balaTextura = IMG_LoadTexture(renderer, "imagenes/bala.png");
+    SDL_Texture *fondoTextura = IMG_LoadTexture(renderer, "imagenes/fondo.png");
+    if (!fondoTextura) {
+        printf("No se pudo cargar la textura de fondo: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+
+    // Configurar propiedades del jugador, enemigo y disparos
+    SDL_Rect jugador = {0, 540, 96, 96};
+    Disparo disparos[MAX_DISPAROS];
+    for (int i = 0; i < MAX_DISPAROS; i++) disparos[i].activo = 0;
+
+    for (int i = 0; i < MAX_DISPAROS; i++) disparosEnemigo2[i].activo = 0;
+
+    Uint32 ultimo_disparo = 0;
+    Uint32 cooldown = 450; // Cooldown entre disparos del jugador
+
+    Enemigo1 enemigo1 = {1820, 540, 96, 96, 1, 4, 0, 200, SDL_GetTicks(), 0};
+    Enemigo2 enemigo2 = {1820, 300, 96, 96, 1, 3, 0, 200, SDL_GetTicks(), 0};
+
+    int frameActual = 0;
+    int tiempoFrame = 100;
+    Uint32 tiempoAnterior = SDL_GetTicks();
+    int enMovimiento = 0;
+    SDL_RendererFlip flip = SDL_FLIP_NONE;
+    Animacion animacionActual = REPOSO;
+    Uint32 tiempoInicioDisparo = 0;
+    int duracionAnimacionDisparo = 400;
+
+    int running = 1;
+    SDL_Event evento;
+    int velocidad = 10;
+    int ultima_direccion_x = 1;
+
+    // Bucle principal del juego
+    while (running) {
+        enMovimiento = 0;
+
+        // Manejo de eventos
+        while (SDL_PollEvent(&evento)) {
+            if (evento.type == SDL_QUIT) {
+                running = 0;
+            } else if (evento.type == SDL_KEYDOWN) {
+                switch (evento.key.keysym.sym) {
+                    case SDLK_w: // Movimiento arriba
+                        jugador.y -= velocidad;
+                        enMovimiento = 1;
+                        animacionActual = CAMINAR;
+                        break;
+                    case SDLK_s: // Movimiento abajo
+                        jugador.y += velocidad;
+                        enMovimiento = 1;
+                        animacionActual = CAMINAR;
+                        break;
+                    case SDLK_a: // Movimiento izquierda
+                        jugador.x -= velocidad;
+                        ultima_direccion_x = -1;
+                        enMovimiento = 1;
+                        flip = SDL_FLIP_HORIZONTAL;
+                        animacionActual = CAMINAR;
+                        break;
+                    case SDLK_d: // Movimiento derecha
+                        jugador.x += velocidad;
+                        ultima_direccion_x = 1;
+                        enMovimiento = 1;
+                        flip = SDL_FLIP_NONE;
+                        animacionActual = CAMINAR;
+                        break;
+                    case SDLK_j: // Disparo
+                        if (SDL_GetTicks() > ultimo_disparo + cooldown) {
+                            for (int i = 0; i < MAX_DISPAROS; i++) {
+                                if (!disparos[i].activo) {
+                                    disparos[i].activo = 1;
+                                    disparos[i].x = jugador.x + jugador.w / 2 - 16;
+                                    disparos[i].y = jugador.y + jugador.h / 2 - 16;
+                                    disparos[i].ancho = 32;
+                                    disparos[i].alto = 32;
+                                    disparos[i].direccion_x = ultima_direccion_x;
+                                    ultimo_disparo = SDL_GetTicks();
+                                    animacionActual = DISPARO;
+                                    tiempoInicioDisparo = SDL_GetTicks();
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        // Control de animaciones del jugador
+        if (animacionActual == DISPARO && SDL_GetTicks() > tiempoInicioDisparo + duracionAnimacionDisparo) {
+            animacionActual = REPOSO;
+        }
+
+        // Actualizar frame de animación
+        Uint32 tiempoActual = SDL_GetTicks();
+        if (tiempoActual > tiempoAnterior + tiempoFrame) {
+            frameActual++;
+            tiempoAnterior = tiempoActual;
+            switch (animacionActual) {
+                case REPOSO:
+                    frameActual %= FRAMES_REPOSO;
+                    tiempoFrame = tiempoFrameReposo;
+                    break;
+                case CAMINAR:
+                    frameActual %= FRAMES_CAMINAR;
+                    tiempoFrame = tiempoFrameCaminar;
+                    break;
+                case DISPARO:
+                    frameActual %= FRAMES_DISPARO;
+                    break;
+                case ENEMIGO1_ANIMACION:
+                    enemigo1.frameActual = (enemigo1.frameActual + 1) % FRAMES_ENEMIGO1;
+                    break;
+                case ENEMIGO2_ANIMACION:
+                    enemigo2.frameActual = (enemigo2.frameActual + 1) % FRAMES_ENEMIGO2;
+                    break;
+            }
+        }
+
+        // Control de ataque del enemigo 2
+        if (enemigo2.activo && SDL_GetTicks() > tiempoAtaqueEnemigo2 + cooldownAtaqueEnemigo2 && !atacandoEnemigo2) {
+            if ((float)enemigo2.x / 1920.0 <= LIMITE_ATAQUE_X) {
+                atacandoEnemigo2 = 1;
+                tiempoAtaqueEnemigo2 = SDL_GetTicks();
+            }
+        }
+
+        // Movimiento de disparos
+        for (int i = 0; i < MAX_DISPAROS; i++) {
+            if (disparos[i].activo) {
+                disparos[i].x += disparos[i].direccion_x * VELOCIDAD_DISPARO;
+                if (disparos[i].x < 0 || disparos[i].x > 1920) {
+                    disparos[i].activo = 0;
+                }
+            }
+        }
+
+        // Renderizar el fondo y objetos del juego
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, fondoTextura, NULL, NULL);
+        SDL_Rect srcRect = {frameActual * ANCHO_FRAME, animacionActual * ALTO_FRAME, ANCHO_FRAME, ALTO_FRAME};
+        SDL_RenderCopyEx(renderer, jugadorTextura, &srcRect, &jugador, 0, NULL, flip);
+
+        // Renderizar disparos activos
+        SDL_Rect disparoRect;
+        for (int i = 0; i < MAX_DISPAROS; i++) {
+            if (disparos[i].activo) {
+                disparoRect = (SDL_Rect){disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
+                SDL_RenderCopy(renderer, balaTextura, NULL, &disparoRect);
+            }
+        }
+
+        SDL_RenderPresent(renderer);
+    }
+
+    // Liberar recursos y cerrar SDL
+    SDL_DestroyTexture(fondoTextura);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(ventana);
+    IMG_Quit();
+    SDL_Quit();
+    return 0;
+}
