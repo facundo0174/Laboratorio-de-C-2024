@@ -38,6 +38,17 @@ typedef struct {
     Uint32 tiempoReaparicion;    // Tiempo de reaparición después de ser desactivado
 } Enemigo2;
 
+typedef struct {
+	int x, y;            // Posición en la pantalla
+    int ancho, alto;   // Dimensiones del jugador
+    int salud;           // Salud del jugador
+    int dinero;          //Dinero del jugador
+    int velocidad;       // Velocidad de movimiento
+    int ultima_direccion_x;  //valores de resguardo para direccionar las balas en un sentido u otro
+    int ultima_direccion_y;
+} Jugador;
+
+
 Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
 Uint32 cooldownAtaqueEnemigo2 = 750; // Tiempo entre ataques del enemigo 2
 int atacandoEnemigo2 = 0;            // Estado de ataque del enemigo 2
@@ -136,19 +147,10 @@ int main(int argc, char *argv[]) {
         SDL_Quit();
         return 1;
     }
-
-/*
-	  // Establecer el color de fondo (azul)
-    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // RGB: azul, aplicamos azul a la entidad
-    SDL_RenderClear(renderer); // Llenar con el color establecido, borramos todo lo que tenia la entidad y aplica cambios AUN NO VISIBLES
-    SDL_RenderPresent(renderer); // Mostrar en pantalla LOS CAMBIOS NO VISIBLES
     
-    SDL_Rect rectangulo = {0, 100, 1280, 400}; // realiza un rectangulo relleno, paramentros = (coordenadas x, coordenads y, largo, alto)
-    //SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);//este color se APLICARA a EL SIGUIENTE DIBUJO, si no aparece nada se aplica al FONDO o VENTANA
-    //SDL_RenderFillRect(renderer, &rectangulo);// crea el dibujo RECTANGULO RELLENO, dentro de renderer con la direccion de rectangulo PERO AUN NO ES VISIBLE
-    //SDL_RenderPresent(renderer);//HACE VISIBLE LOS CAMBIOS ANTERIORES
-  	*/
-  	SDL_Rect jugador = {640, 300, 80, 80};
+    //inicializacion de registro o entidad jugador
+	Jugador player = {640, 300, 80, 80, 100, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant
+  	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
   	
 	 // Inicializar los disparos
     Disparo disparos[MAX_DISPAROS];
@@ -183,8 +185,8 @@ int main(int argc, char *argv[]) {
     // los eventos pueden ser de raton, teclado o joystick, todos tienen palabras reservadas down y up, referenciando la accion de apretar y soltar respectivamente
     // se debe configurar ambos de lo contrario la accion se volvera perpetua
    int velocidad = 5; //velocidad traducida en 5 pixeles por bucle segun x accion de desplazamiento en cada eje
-   int ultima_direccion_x = 1;
-   int ultima_direccion_y = 0;
+   //int ultima_direccion_x = 1;
+   //int ultima_direccion_y = 0;
    Disparo disparo = {0, 0, 6, 2, 0, 0, 0}; // inicializamos la entidad disparo desactivada, los parametros son correspondientes y posicionales al struct
    
     while (running) {
@@ -198,59 +200,43 @@ int main(int argc, char *argv[]) {
                 running = 0;
             } else if (evento.type == SDL_KEYDOWN) {
                 switch (evento.key.keysym.sym) {
-                    case SDLK_w: // Movimiento hacia arriba
-                    	/* if (jugador.y - velocidad >= rectangulo.y){
-						 	jugador.y -= velocidad;
-						 	ultima_direccion_x = 0; 
-                        	ultima_direccion_y = -1;
-                        }*/
-                         	jugador.y -= velocidad;
+                    case SDLK_w: 
+                    
+                         	player.y -= player.velocidad;
                          	enMovimiento = 1;
                         	animacionActual = CAMINAR;
-						 	ultima_direccion_x = 0; 
-                        	ultima_direccion_y = -1;
+						 	player.ultima_direccion_x = 0; 
+                        	player.ultima_direccion_y = -1;
                         	
 						break;
 						
-                    case SDLK_s: // Movimiento hacia abajo
-                    	/* if (jugador.y + jugador.h + velocidad <= rectangulo.y + rectangulo.h){
-                        	jugador.y += velocidad;
-                        	ultima_direccion_x = 0; 
-                            ultima_direccion_y = 1;
-						} */
-                       	jugador.y += velocidad;
+                    case SDLK_s:
+                    	
+                       	player.y += player.velocidad;
                        	enMovimiento = 1;
                         animacionActual = CAMINAR;
-                        ultima_direccion_x = 0; 
-                        ultima_direccion_y = 1;
+                        player.ultima_direccion_x = 0; 
+                        player.ultima_direccion_y = 1;
                         break;
                         
-                    case SDLK_a: // Movimiento hacia la izquierda
-                    	/* if (jugador.x - velocidad >= rectangulo.x){
-                        	 jugador.x -= velocidad;
-                        	 ultima_direccion_x = -1; 
-                             ultima_direccion_y = 0;
-                    } */
-                        jugador.x -= velocidad;
+                    case SDLK_a: 
+                    
+                        player.x -= player.velocidad;
                         enMovimiento = 1;
                         flip = SDL_FLIP_HORIZONTAL;
                         animacionActual = CAMINAR;
-                    	ultima_direccion_x = -1; 
-                        ultima_direccion_y = 0;
+                    	player.ultima_direccion_x = -1; 
+                        player.ultima_direccion_y = 0;
 						break;
 						
-                    case SDLK_d: // Movimiento hacia la derecha
-                    	/*  if (jugador.x + jugador.w + velocidad <= rectangulo.x + rectangulo.w){
-							jugador.x += velocidad;
-							ultima_direccion_x = 1; 
-                            ultima_direccion_y = 0;
-                        } */
-                       	jugador.x += velocidad;
+                    case SDLK_d: 
+                    
+                       	player.x += player.velocidad;
                        	enMovimiento = 1;
                         flip = SDL_FLIP_NONE;
                         animacionActual = CAMINAR;
-						ultima_direccion_x = 1; 
-                        ultima_direccion_y = 0;
+						player.ultima_direccion_x = 1; 
+                        player.ultima_direccion_y = 0;
                         break;
                         
                     case SDLK_j:// disparo con la letra "j"
@@ -258,12 +244,12 @@ int main(int argc, char *argv[]) {
                                 for (i = 0; i < MAX_DISPAROS; i++) {
                                     if (!disparos[i].activo) { // Encontrar un disparo inactivo
                                         disparos[i].activo = 1;
-                                        disparos[i].x = jugador.x + jugador.w / 2 - 3; // Centrar el disparo
-                                        disparos[i].y = jugador.y + jugador.h / 2 - 1;
+                                        disparos[i].x = player.x + player.ancho / 2 - 3; // Centrar el disparo
+                                        disparos[i].y = player.y + player.alto / 2 - 1;
                                         disparos[i].ancho = 20;
                                         disparos[i].alto = 20;
-                                        disparos[i].direccion_x = ultima_direccion_x;
-                                        disparos[i].direccion_y = ultima_direccion_y;
+                                        disparos[i].direccion_x = player.ultima_direccion_x;
+                                        disparos[i].direccion_y = player.ultima_direccion_y;
                                         ultimo_disparo = SDL_GetTicks();
                                     	animacionActual = DISPARO;
                                     	tiempoInicioDisparo = SDL_GetTicks();
@@ -275,22 +261,6 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        /*
-		// Mover/actualizar el disparo si está activo
-        for (i = 0; i < MAX_DISPAROS; i++) {
-            if (disparos[i].activo) {
-                int velocidad_disparo = 10;
-                disparos[i].x += disparos[i].direccion_x * velocidad_disparo;
-                disparos[i].y += disparos[i].direccion_y * velocidad_disparo;
-
-                // Si el disparo sale de los límites del rectángulo, desactivarlo
-                if (disparos[i].x < rectangulo.x || disparos[i].x > rectangulo.x + rectangulo.w ||
-                    disparos[i].y < rectangulo.y || disparos[i].y > rectangulo.y + rectangulo.h) {
-                    disparos[i].activo = 0;
-                }
-            }
-            
-        }*/
         
         // Control de animaciones del jugador
         if (animacionActual == DISPARO && SDL_GetTicks() > tiempoInicioDisparo + duracionAnimacionDisparo) {
@@ -299,30 +269,7 @@ int main(int argc, char *argv[]) {
 
         // Actualizar frame de animación
         Uint32 tiempoActual = SDL_GetTicks();
-        /*
-        if (tiempoActual > tiempoAnterior + tiempoFrame) {
-            frameActual++;
-            tiempoAnterior = tiempoActual;
-            switch (animacionActual) {
-                case REPOSO:
-                    frameActual %= FRAMES_REPOSO;
-                    tiempoFrame = tiempoFrameReposo;
-                    break;
-                case CAMINAR:
-                    frameActual %= FRAMES_CAMINAR;
-                    tiempoFrame = tiempoFrameCaminar;
-                    break;
-                case DISPARO:
-                    frameActual %= FRAMES_DISPARO;
-                    break;
-                case ENEMIGO1_ANIMACION:
-                    enemigo1.frameActual = (enemigo1.frameActual + 1) % FRAMES_ENEMIGO1;
-                    break;
-                case ENEMIGO2_ANIMACION:
-                    enemigo2.frameActual = (enemigo2.frameActual + 1) % FRAMES_ENEMIGO2;
-                    break;
-            }
-        }*/
+
         if (animacionActual == CAMINAR) {
 		    // Ralentizamos la animación al caminar
 		    if (tiempoActual > tiempoAnterior + tiempoFrameCaminar) {
@@ -455,7 +402,14 @@ int main(int argc, char *argv[]) {
         	}
 		}
         
+        // Actualización de posición del rectángulo de representación
+		jugador.x = player.x;
+		jugador.y = player.y;
+		jugador.w = player.ancho;
+		jugador.h = player.alto;
+        
 		// Renderizado del jugador
+		
 		SDL_Rect srcRect = {frameActual * ANCHO_FRAME, animacionActual * ALTO_FRAME, ANCHO_FRAME, ALTO_FRAME};
 		SDL_Rect dstRect = {jugador.x, jugador.y, jugador.w, jugador.h};
 		SDL_RenderCopyEx(renderer, jugadorTextura, &srcRect, &dstRect, 0, NULL, flip);
@@ -502,65 +456,7 @@ int main(int argc, char *argv[]) {
 		 SDL_RenderPresent(renderer);
         SDL_Delay(16);
 	}
-		/*
-		        // Control de ataque del enemigo 2
-        if (enemigo2.activo && SDL_GetTicks() > tiempoAtaqueEnemigo2 + cooldownAtaqueEnemigo2 && !atacandoEnemigo2) {
-            if ((float)enemigo2.x / 1920.0 <= LIMITE_ATAQUE_X) {
-                atacandoEnemigo2 = 1;
-                tiempoAtaqueEnemigo2 = SDL_GetTicks();
-            }
-        }
-        
-         // Renderizar el fondo y objetos del juego
-        SDL_RenderClear(renderer);
-
-        SDL_Rect srcRect = {frameActual * ANCHO_FRAME, animacionActual * ALTO_FRAME, ANCHO_FRAME, ALTO_FRAME};
-        SDL_RenderCopyEx(renderer, jugadorTextura, &srcRect, &jugador, 0, NULL, flip);
-
-        // Renderizar disparos activos
-        SDL_Rect disparoRect;
-        for (i = 0; i < MAX_DISPAROS; i++) {
-            if (disparos[i].activo) {
-                disparoRect = (SDL_Rect){disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
-                SDL_RenderCopy(renderer, balaTextura, NULL, &disparoRect);
-            }
-        }
-
-        SDL_RenderPresent(renderer);
-    }*/
-
-        
-		/*   
-           // Limpiar la pantalla
-        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Fondo azul de la ventana principal
-        SDL_RenderClear(renderer);
-
-        // Dibujar el rectángulo límite
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // fondo negro del "puente"
-        SDL_RenderFillRect(renderer, &rectangulo);
-
-        // Dibujar el cuadrado en su posición actual
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // verde para el jugador
-        SDL_RenderFillRect(renderer, &jugador);
-        
-        // Dibujar los disparos
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Rojo para los disparos
-        for ( i = 0; i < MAX_DISPAROS; i++) {
-            if (disparos[i].activo) {
-                SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
-                SDL_RenderFillRect(renderer, &rect_disparo);
-            }
-        }
-
-        // Actualizar la pantalla
-        SDL_RenderPresent(renderer);
 		
-        SDL_Delay(16); // Para limitar el uso de CPU (aprox. 60 FPS)
-        
-    }
-        
-        */
-
     // Liberar recursos y cerrar SDL
     SDL_DestroyTexture(proyectilEnemigo2Textura);
 	SDL_DestroyTexture(fondoTextura);
