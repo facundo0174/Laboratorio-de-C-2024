@@ -1,6 +1,11 @@
 #include <SDL.h>
 #include <stdio.h>
 #include <SDL_image.h>
+#include <windows.h>
+void mostrarVentanaEmergente() {
+    MessageBox(NULL, "HAS SIDO PERDIDO SALUD.", "DAMAGE ADQUIERED", MB_OK | MB_ICONINFORMATION);
+}
+
 // la mayoria de datos SDL, se reprecentan de la siguiente manera:
 // SDL_tipoDeDatoVariable *nombreReprecentativo = FuncionReservada (parametros) 
 // algunas veces el igual no hace falta, por ejemplo los casos de eventos, ya que solo necesitamos tener/nombrar una variable para acceder a ellos ya que
@@ -435,6 +440,8 @@ int main(int argc, char *argv[]) {
             }
         }
         
+        
+        
         if (enemigo1.activo) {
             SDL_Rect enemigo1SrcRect = {enemigo1.frameActual * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
             SDL_Rect enemigo1DstRect = {enemigo1.x, enemigo1.y, enemigo1.ancho, enemigo1.alto};
@@ -453,8 +460,59 @@ int main(int argc, char *argv[]) {
     		SDL_Rect enemigo2DstRect = {enemigo2.x, enemigo2.y, enemigo2.ancho, enemigo2.alto};
     		SDL_RenderCopy(renderer, enemigo2Textura, &enemigo2SrcRect, &enemigo2DstRect);
 		}
-		 SDL_RenderPresent(renderer);
+		// aqui sigue el tratamiento de intersecciones entre entidades, ademas un agregado de HITBOX visibles por propositos de depuracion
+		if (enemigo1.activo && enemigo2.activo){
+			SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
+			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
+			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
+			if (SDL_HasIntersection(&jugadorHitbox, &enemigo1Rect) || SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
+				running = 0;
+				mostrarVentanaEmergente();
+				sleep (3000);			
+			}
+		}else if (enemigo1.activo){
+			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
+			SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
+			if (SDL_HasIntersection(&jugadorHitbox, &enemigo1Rect)){
+				running = 0;
+				mostrarVentanaEmergente();
+				sleep (3000);			
+			}	
+		}else if (enemigo2.activo){
+			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
+			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
+			if (SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
+				running = 0;
+				mostrarVentanaEmergente();
+				sleep (3000);			
+			}
+		}
+		
+		        // Establece un color para los rectángulos de colisión (rojo)
+SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+
+// Dibuja el rectángulo de colisión del jugador
+SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
+SDL_RenderDrawRect(renderer, &jugadorHitbox);
+
+// Dibuja el rectángulo de colisión de los enemigos si están activos
+if (enemigo1.activo) {
+    SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
+    SDL_RenderDrawRect(renderer, &enemigo1Rect);
+}
+
+if (enemigo2.activo) {
+    SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
+    SDL_RenderDrawRect(renderer, &enemigo2Rect);
+}
+
+// Restablece el color original para evitar afectar otros elementos
+SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Ajusta según tu color de fondo original
+  
+		SDL_RenderPresent(renderer);
         SDL_Delay(16);
+        
+    
 	}
 		
     // Liberar recursos y cerrar SDL
