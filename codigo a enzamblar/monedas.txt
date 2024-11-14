@@ -1,0 +1,233 @@
+#include <SDL.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+typedef struct {
+    int x, y;               // Posición del disparo
+    int ancho, alto;        // Tamaño del disparo
+    int activo;             // Si el disparo está en pantalla
+    int direccion_x, direccion_y; // Dirección de movimiento
+} Disparo;
+
+typedef struct {
+    int x, y;               // Posición del enemigo
+    int ancho, alto;        // Tamaño del enemigo
+    int activo;             // Si el enemigo está vivo
+    int vida;               // Vida del enemigo
+} Enemigo;
+
+typedef struct {
+    int x, y;               // Posición de la moneda
+    int ancho, alto;        // Tamaño de la moneda
+    int activo;             // Si la moneda está en pantalla
+} Moneda;
+
+#define MAX_DISPAROS 10
+#define MAX_ENEMIGOS 10
+#define MAX_MONEDAS 5
+
+int puntuacion = 0;  // Puntuación del jugador
+    
+    int i;
+    int j;
+
+void generar_moneda(Moneda monedas[MAX_MONEDAS], int x, int y) {
+    for ( i = 0; i < MAX_MONEDAS; i++) {
+        if (!monedas[i].activo) {
+            monedas[i].activo = 1;
+            monedas[i].x = x;
+            monedas[i].y = y;
+            monedas[i].ancho = 10;
+            monedas[i].alto = 10;
+            break;
+        }
+    }
+}
+
+
+int main(int argc, char *argv[]) {
+    srand(time(NULL));  // Inicializar el generador de números aleatorios
+
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("No se pudo inicializar SDL: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    SDL_Window *ventana = SDL_CreateWindow("Survival",
+                                          SDL_WINDOWPOS_CENTERED,
+                                          SDL_WINDOWPOS_CENTERED,
+                                          1280, 600,
+                                          SDL_WINDOW_SHOWN);
+    if (!ventana) {
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        SDL_DestroyWindow(ventana);
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Rect rectangulo = {0, 100, 1280, 400};
+    SDL_Rect jugador = {640, 300, 20, 20};
+
+    Disparo disparos[MAX_DISPAROS];
+    Enemigo enemigos[MAX_ENEMIGOS];
+    Moneda monedas[MAX_MONEDAS];
+
+
+    for (i = 0; i < MAX_DISPAROS; i++) disparos[i].activo = 0;
+    for (i = 0; i < MAX_ENEMIGOS; i++) enemigos[i].activo = 0;
+    for (i = 0; i < MAX_MONEDAS; i++) monedas[i].activo = 0;
+
+    // Variables para aparición continua de enemigos
+    Uint32 tiempo_crear_enemigo = SDL_GetTicks();
+    Uint32 intervalo_creacion = 2000; // Aparecen cada 2 segundos
+    int velocidad_enemigo = 2;
+
+    Uint32 ultimo_disparo = 0;
+    Uint32 cooldown = 500;
+    int running = 1;
+    SDL_Event evento;
+    int velocidad = 5;
+    int ultima_direccion_x = 1;
+    int ultima_direccion_y = 0;
+
+    while (running) {
+        Uint32 tiempo_actual = SDL_GetTicks();
+
+        // Crear enemigos continuamente
+        if (tiempo_actual - tiempo_crear_enemigo >= intervalo_creacion) {
+            tiempo_crear_enemigo = tiempo_actual;
+            for (i = 0; i < MAX_ENEMIGOS; i++) {
+                if (!enemigos[i].activo) {
+                    enemigos[i].activo = 1;
+                    enemigos[i].x = 1280;
+                    enemigos[i].y = rectangulo.y + rand() % (rectangulo.h - 20);
+                    enemigos[i].ancho = 20;
+                    enemigos[i].alto = 20;
+                    enemigos[i].vida = 4;
+                    break;
+                }
+            }
+        }
+		
+		for ( i = 0; i < MAX_MONEDAS; i++) {
+		    if (monedas[i].activo) {
+		        SDL_Rect moneda_rect = {monedas[i].x, monedas[i].y, monedas[i].ancho, monedas[i].alto};
+		        if (SDL_HasIntersection(&moneda_rect, &jugador)) {
+		            // El jugador recoge la moneda
+		            monedas[i].activo = 0;  // Desactivar moneda
+		            puntuacion += 10;       // Aumentar puntuación (puedes cambiar el valor si deseas)
+		            printf("Puntuación: %d\n", puntuacion);  // Mostrar puntuación en consola
+		        }
+		    }
+		}
+
+        while (SDL_PollEvent(&evento)) {
+            if (evento.type == SDL_QUIT) running = 0;
+            else if (evento.type == SDL_KEYDOWN) {
+                switch (evento.key.keysym.sym) {
+                    case SDLK_w: jugador.y -= (jugador.y - velocidad >= rectangulo.y) ? velocidad : 0; ultima_direccion_x = 0; ultima_direccion_y = -1; break;
+                    case SDLK_s: jugador.y += (jugador.y + jugador.h + velocidad <= rectangulo.y + rectangulo.h) ? velocidad : 0; ultima_direccion_x = 0; ultima_direccion_y = 1; break;
+                    case SDLK_a: jugador.x -= (jugador.x - velocidad >= rectangulo.x) ? velocidad : 0; ultima_direccion_x = -1; ultima_direccion_y = 0; break;
+                    case SDLK_d: jugador.x += (jugador.x + jugador.w + velocidad <= rectangulo.x + rectangulo.w) ? velocidad : 0; ultima_direccion_x = 1; ultima_direccion_y = 0; break;
+                    case SDLK_j: {
+                        if (tiempo_actual > ultimo_disparo + cooldown) {
+                            for ( i = 0; i < MAX_DISPAROS; i++) {
+                                if (!disparos[i].activo) {
+                                    disparos[i].activo = 1;
+                                    disparos[i].x = jugador.x + jugador.w / 2 - 3;
+                                    disparos[i].y = jugador.y + jugador.h / 2 - 1;
+                                    disparos[i].ancho = 6;
+                                    disparos[i].alto = 2;
+                                    disparos[i].direccion_x = ultima_direccion_x;
+                                    disparos[i].direccion_y = ultima_direccion_y;
+                                    ultimo_disparo = tiempo_actual;
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Detectar colisiones entre disparos y enemigos
+		for ( i = 0; i < MAX_DISPAROS; i++) {
+		    if (disparos[i].activo) {
+		        disparos[i].x += disparos[i].direccion_x * 10;
+		        disparos[i].y += disparos[i].direccion_y * 10;
+		
+		        // Comprobar colisión con enemigos
+		        for ( j = 0; j < MAX_ENEMIGOS; j++) {
+		            if (enemigos[j].activo && SDL_HasIntersection(&(SDL_Rect){disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto},
+		                                                          &(SDL_Rect){enemigos[j].x, enemigos[j].y, enemigos[j].ancho, enemigos[j].alto})) {
+		                // El enemigo muere
+		                enemigos[j].activo = 0;
+		                disparos[i].activo = 0;
+		
+		                // Generar moneda en la posición del enemigo muerto
+		                generar_moneda(monedas, enemigos[j].x, enemigos[j].y);
+		            }
+		        }
+		    }
+		}
+
+
+        for ( i = 0; i < MAX_ENEMIGOS; i++) {
+            if (enemigos[i].activo) {
+                enemigos[i].x -= velocidad_enemigo;
+                if (enemigos[i].x < rectangulo.x) enemigos[i].activo = 0;
+            }
+        }
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+        SDL_RenderFillRect(renderer, &jugador);
+
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        for ( i = 0; i < MAX_DISPAROS; i++) {
+            if (disparos[i].activo) {
+                SDL_Rect rect = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
+                SDL_RenderFillRect(renderer, &rect);
+            }
+        }
+
+        // Renderizar enemigos
+		SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+		for ( i = 0; i < MAX_ENEMIGOS; i++) {
+		    if (enemigos[i].activo) {
+		        SDL_Rect rect = {enemigos[i].x, enemigos[i].y, enemigos[i].ancho, enemigos[i].alto};
+		        SDL_RenderFillRect(renderer, &rect);
+		    }
+		}
+		
+		// Renderizar monedas
+		SDL_SetRenderDrawColor(renderer, 255, 215, 0, 255); // Color dorado para las monedas
+		for ( i = 0; i < MAX_MONEDAS; i++) {
+		    if (monedas[i].activo) {
+		        SDL_Rect rect = {monedas[i].x, monedas[i].y, monedas[i].ancho, monedas[i].alto};
+		        SDL_RenderFillRect(renderer, &rect);
+		    }
+		}
+
+
+        SDL_RenderPresent(renderer);
+        SDL_Delay(16);
+        
+        
+        
+    }
+
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(ventana);
+    SDL_Quit();
+
+    return 0;
+}

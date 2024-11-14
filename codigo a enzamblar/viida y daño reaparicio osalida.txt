@@ -1,0 +1,208 @@
+#include <SDL.h>
+#include <stdio.h>
+// con h te haces daño con k te curas
+typedef struct {
+    int x, y;               // Posición del disparo
+    int ancho, alto;        // Tamaño del disparo
+    int activo;             // Si el disparo está en pantalla
+    int direccion_x, direccion_y; // Dirección de movimiento
+} Disparo;
+
+#define MAX_DISPAROS 10
+#define VIDA_MAXIMA 6
+
+int main(int argc, char *argv[]) {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("No se pudo inicializar SDL: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    SDL_Window *ventana = SDL_CreateWindow("Survival",
+                                          SDL_WINDOWPOS_CENTERED,
+                                          SDL_WINDOWPOS_CENTERED,
+                                          1280, 600,
+                                          SDL_WINDOW_SHOWN);
+    if (!ventana) {
+        printf("No se pudo crear la ventana: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        printf("No se pudo crear el renderer: %s\n", SDL_GetError());
+        SDL_DestroyWindow(ventana);
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Rect rectangulo = {0, 100, 1280, 400};
+    SDL_Rect jugador = {640, 300, 20, 20};
+
+    Disparo disparos[MAX_DISPAROS];
+    int i;
+
+    for (i = 0; i < MAX_DISPAROS; i++) {
+        disparos[i].activo = 0;
+    }
+
+    Uint32 ultimo_disparo = 0;
+    Uint32 cooldown = 500;
+    int running = 1;
+    int game_over = 0; // Nueva variable para estado de Game Over
+    int velocidad = 5;
+    int ultima_direccion_x = 1;
+    int ultima_direccion_y = 0;
+    int vida = VIDA_MAXIMA;
+
+    SDL_Event evento;
+
+    // Función para manejar daño al jugador
+    void recibir_dano() {
+        if (vida > 0) {
+            vida--;
+            printf("¡Jugador recibió daño! Vida restante: %d\n", vida);
+        }
+        if (vida <= 0) {
+            printf("¡Juego terminado! Vida agotada.\n");
+            game_over = 1; // Activar Game Over
+        }
+    }
+
+    // Función para reiniciar el juego
+    void reiniciar_juego() {
+        jugador.x = 640;
+        jugador.y = 300;
+        vida = VIDA_MAXIMA;
+        for (i = 0; i < MAX_DISPAROS; i++) {
+            disparos[i].activo = 0;
+        }
+        game_over = 0;
+        printf("Juego reiniciado.\n");
+    }
+
+    while (running) {
+        while (SDL_PollEvent(&evento)) {
+            if (evento.type == SDL_QUIT) {
+                running = 0;
+            } else if (evento.type == SDL_KEYDOWN) {
+                if (!game_over) { // Si no es Game Over, se permite el movimiento
+                    switch (evento.key.keysym.sym) {
+                        case SDLK_w:
+                            if (jugador.y - velocidad >= rectangulo.y) {
+                                jugador.y -= velocidad;
+                                ultima_direccion_y = -1;
+                                ultima_direccion_x = 0;
+                            }
+                            break;
+                        case SDLK_s:
+                            if (jugador.y + jugador.h + velocidad <= rectangulo.y + rectangulo.h) {
+                                jugador.y += velocidad;
+                                ultima_direccion_y = 1;
+                                ultima_direccion_x = 0;
+                            }
+                            break;
+                        case SDLK_a:
+                            if (jugador.x - velocidad >= rectangulo.x) {
+                                jugador.x -= velocidad;
+                                ultima_direccion_x = -1;
+                                ultima_direccion_y = 0;
+                            }
+                            break;
+                        case SDLK_d:
+                            if (jugador.x + jugador.w + velocidad <= rectangulo.x + rectangulo.w) {
+                                jugador.x += velocidad;
+                                ultima_direccion_x = 1;
+                                ultima_direccion_y = 0;
+                            }
+                            break;
+                        case SDLK_j: {
+                            Uint32 tiempo_actual = SDL_GetTicks();
+                            if (tiempo_actual > ultimo_disparo + cooldown) {
+                                for (i = 0; i < MAX_DISPAROS; i++) {
+                                    if (!disparos[i].activo) {
+                                        disparos[i].activo = 1;
+                                        disparos[i].x = jugador.x + jugador.w / 2;
+                                        disparos[i].y = jugador.y + jugador.h / 2;
+                                        disparos[i].ancho = 5;
+                                        disparos[i].alto = 5;
+                                        disparos[i].direccion_x = ultima_direccion_x;
+                                        disparos[i].direccion_y = ultima_direccion_y;
+                                        ultimo_disparo = tiempo_actual;
+                                        break;
+                        case SDLK_k: // Curarse con la tecla "K"
+						    if (vida < VIDA_MAXIMA) {
+						        vida++;
+						        printf("¡Jugador se curó! Vida actual: %d\n", vida);
+						    } else {
+						        printf("¡Vida al máximo! No se puede curar más.\n");
+						    }
+						    break;
+
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                        case SDLK_h:
+                            recibir_dano();
+                            break;
+                    }
+                }
+            } else if (evento.type == SDL_MOUSEBUTTONDOWN && game_over) {
+                int mouse_x, mouse_y;
+                SDL_GetMouseState(&mouse_x, &mouse_y);
+
+                int menu_x = 540, menu_y = 200;
+                int boton_ancho = 200, boton_alto = 60;
+
+                SDL_Rect boton_reintentar = {menu_x, menu_y, boton_ancho, boton_alto};
+                SDL_Rect boton_cerrar = {menu_x, menu_y + 80, boton_ancho, boton_alto};
+
+                if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_reintentar)) {
+                    reiniciar_juego();
+                }
+                if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_cerrar)) {
+                    running = 0;
+                }
+            }
+        }
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+        SDL_RenderClear(renderer);
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderFillRect(renderer, &rectangulo);
+
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+        SDL_RenderFillRect(renderer, &jugador);
+
+        // Indicador de vida
+        for (i = 0; i < VIDA_MAXIMA; i++) {
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            SDL_Rect vida_rect = {10 + i * 30, 10, 20, 20};
+            if (i >= vida) {
+                SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
+            }
+            SDL_RenderFillRect(renderer, &vida_rect);
+        }
+
+        // Mostrar menú de Game Over
+        if (game_over) {
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL_Rect boton_reintentar = {540, 200, 200, 60};
+            SDL_Rect boton_cerrar = {540, 280, 200, 60};
+            SDL_RenderDrawRect(renderer, &boton_reintentar);
+            SDL_RenderDrawRect(renderer, &boton_cerrar);
+        }
+
+        SDL_RenderPresent(renderer);
+        SDL_Delay(16);
+    }
+
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(ventana);
+    SDL_Quit();
+
+    return 0;
+}
