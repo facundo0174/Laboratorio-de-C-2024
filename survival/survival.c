@@ -2,8 +2,11 @@
 #include <stdio.h>
 #include <SDL_image.h>
 #include <windows.h>
+#include <stdlib.h>
+#include <time.h>
+
 void mostrarVentanaEmergente() {
-    MessageBox(NULL, "HAS SIDO PERDIDO SALUD.", "DAMAGE ADQUIERED", MB_OK | MB_ICONINFORMATION);
+    printf("hitbox detectado, has sido dañado");
 }
 
 // la mayoria de datos SDL, se reprecentan de la siguiente manera:
@@ -30,6 +33,7 @@ typedef struct {
     int tiempoFrame;             // Duración de cada frame en ms
     Uint32 tiempoAnterior;       // Marca de tiempo del último frame
     Uint32 tiempoReaparicion;    // Tiempo de reaparición después de ser desactivado
+    int vida;
 } Enemigo1;
 
 typedef struct {
@@ -53,11 +57,18 @@ typedef struct {
     int ultima_direccion_y;
 } Jugador;
 
+typedef struct {
+    int x, y;               // Posición de la moneda
+    int ancho, alto;        // Tamaño de la moneda
+    int activo;             // Si la moneda está en pantalla
+} Moneda;
+
+
 
 Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
 Uint32 cooldownAtaqueEnemigo2 = 750; // Tiempo entre ataques del enemigo 2
 int atacandoEnemigo2 = 0;            // Estado de ataque del enemigo 2
-
+Uint32 tiempo_actual;
 // Constantes para controlar las animaciones, velocidad y dimensiones de los sprites
 #define FRAMES_PROYECTIL_ENEMIGO2 6
 #define FRAMES_ATAQUE_ENEMIGO2 4
@@ -73,6 +84,10 @@ int atacandoEnemigo2 = 0;            // Estado de ataque del enemigo 2
 #define VELOCIDAD_DISPARO 10
 #define TIEMPO_REAPARICION_ENEMIGO 2000 // Tiempo de reaparición del enemigo en ms
 #define MAX_DISPAROS 10
+#define MAX_MONEDAS 5
+#define MAX_ENEMIGOS 10
+
+
 
 Disparo disparosEnemigo2[MAX_DISPAROS];
 // Enumeración para controlar el tipo de animación
@@ -93,9 +108,48 @@ int detectarColision(SDL_Rect a, SDL_Rect b) {
     return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
 }
 
+int puntuacion = 0;  // Puntuación del jugador
+int i;
+int j;
+
+void generar_moneda(Moneda monedas[MAX_MONEDAS], int x, int y) {
+    for ( i = 0; i < MAX_MONEDAS; i++) {
+        if (!monedas[i].activo) {
+            monedas[i].activo = 1;
+            monedas[i].x = x;
+            monedas[i].y = y;
+            monedas[i].ancho = 10;
+            monedas[i].alto = 10;
+            break;
+        }
+    }
+}
+
+void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual){
+	int i =0;
+	for (i=0; i<MAX_ENEMIGOS; i++){
+		if (enemigo1[i].activo){
+			enemigo1[i].x -= enemigo1[i].velocidad_x;
+			if (enemigo1[i].x < 0) {
+				enemigo1[i].activo = 0;
+				enemigo1[i].tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;
+			}
+			if (tiempo_actual > enemigo1[i].tiempoAnterior + enemigo1[i].tiempoFrame) {
+                enemigo1[i].frameActual = (enemigo1[i].frameActual + 1) % FRAMES_ENEMIGO1;
+                enemigo1[i].tiempoAnterior = tiempo_actual;
+			}
+		}else if (tiempo_actual > enemigo1[i].tiempoReaparicion) {
+            	enemigo1[i].activo = 1;
+            	enemigo1[i].vida = 3;
+            	enemigo1[i].x = 1200; 
+        		enemigo1[i].y = rand() % (750 - 300);
+		}
+		
+	}	
+}
 
 int main(int argc, char *argv[]) {
-	
+	srand(time(NULL));  // Inicializar el generador de números aleatorios
     // Inicializar SDL y SDL_image
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("No se pudo inicializar SDL: %s\n", SDL_GetError());
@@ -159,6 +213,9 @@ int main(int argc, char *argv[]) {
   	
 	 // Inicializar los disparos
     Disparo disparos[MAX_DISPAROS];
+    Moneda monedas[MAX_MONEDAS];
+    Enemigo1 enemigo1[MAX_ENEMIGOS];
+    
     int i= 0;
     for ( i = 0; i < MAX_DISPAROS; i++) {
         disparos[i].activo = 0;
@@ -167,11 +224,38 @@ int main(int argc, char *argv[]) {
     for (i = 0; i < MAX_DISPAROS; i++) {
     disparosEnemigo2[i].activo = 0;
 	}
+	
+	for (i = 0; i < MAX_MONEDAS; i++){
+		monedas[i].activo = 0;
+	} 
+	
+	for (i = 0; i < MAX_ENEMIGOS; i++) {
+        enemigo1[i].x = 1200; // Posición inicial aleatoria
+        enemigo1[i].y = rand() % (750 - 300);
+        enemigo1[i].ancho = 80;       // Ancho predeterminado
+        enemigo1[i].alto = 80;        // Alto predeterminado
+        enemigo1[i].activo = 1;       // Activo al inicio
+        enemigo1[i].velocidad_x = 3; // Velocidad
+        enemigo1[i].frameActual=0;
+        enemigo1[i].tiempoFrame=200;
+        enemigo1[i].tiempoAnterior=SDL_GetTicks();
+        enemigo1[i].tiempoReaparicion=1000; 
+        enemigo1[i].vida = 3;
+    }
+    
+    /* //lo siguiente es controlado al momento de la creacion de la entidad en el caso de la velocidad, el intervalo quedara en veremos
+
+    // Variables para aparición continua de enemigos
+    Uint32 tiempo_crear_enemigo = SDL_GetTicks();
+    Uint32 intervalo_creacion = 2000; // Aparecen cada 2 segundos
+    int velocidad_enemigo = 2;
+
+    */
     
      // Variables para el cooldown de disparo
     Uint32 ultimo_disparo = 0;
     Uint32 cooldown = 500; // 500 milisegundos
-    Enemigo1 enemigo1 = {1000, 500, 80, 80, 1, 4, 0, 200, SDL_GetTicks(), 0};
+    //Enemigo1 enemigo1 = {1000, 500, 80, 80, 1, 4, 0, 200, SDL_GetTicks(), 0};
     Enemigo2 enemigo2 = {1000, 300, 80, 80, 1, 3, 0, 200, SDL_GetTicks(), 0};
     
     int frameActual = 0;
@@ -198,6 +282,8 @@ int main(int argc, char *argv[]) {
         // Procesar eventos
         // SDL_PollEvent es algo asi como un CACHE de eventos captados por la "ventana" renderizada por SDL
         enMovimiento = 0;
+        tiempo_actual = SDL_GetTicks();
+        
         //bucle administrador de eventos
         while (SDL_PollEvent(&evento)) {
         	//recorre la cola de eventos y realiza opciones segun corresponda
@@ -267,6 +353,8 @@ int main(int argc, char *argv[]) {
             }
         }
         
+        
+        
         // Control de animaciones del jugador
         if (animacionActual == DISPARO && SDL_GetTicks() > tiempoInicioDisparo + duracionAnimacionDisparo) {
             animacionActual = REPOSO;
@@ -277,21 +365,21 @@ int main(int argc, char *argv[]) {
 
         if (animacionActual == CAMINAR) {
 		    // Ralentizamos la animación al caminar
-		    if (tiempoActual > tiempoAnterior + tiempoFrameCaminar) {
+		    if (tiempo_actual > tiempoAnterior + tiempoFrameCaminar) {
 		        frameActual = (frameActual + 1) % FRAMES_CAMINAR;
-		        tiempoAnterior = tiempoActual;
+		        tiempoAnterior = tiempo_actual;
 		    }
 		} else if (animacionActual == REPOSO) {
 		    // Ralentizamos la animación de reposo
-		    if (tiempoActual > tiempoAnterior + tiempoFrameReposo) {
+		    if (tiempo_actual > tiempoAnterior + tiempoFrameReposo) {
 		        frameActual = (frameActual + 1) % FRAMES_REPOSO;
-		        tiempoAnterior = tiempoActual;
+		        tiempoAnterior = tiempo_actual;
 		    }
 		} else {
 		    // Para otras animaciones, puedes dejar el tiempo por defecto
-		    if (tiempoActual > tiempoAnterior + tiempoFrame) {
+		    if (tiempo_actual > tiempoAnterior + tiempoFrame) {
 		        frameActual = (frameActual + 1) % FRAMES_REPOSO;
-		        tiempoAnterior = tiempoActual;
+		        tiempoAnterior = tiempo_actual;
 		    }
 		}
 
@@ -308,18 +396,7 @@ int main(int argc, char *argv[]) {
         }
         
         // actualizacion de enemigo 1
-        if (enemigo1.activo) {
-            enemigo1.x -= enemigo1.velocidad_x;
-            if (enemigo1.x < 0) enemigo1.x = 1024 - enemigo1.ancho;
-            if (tiempoActual > enemigo1.tiempoAnterior + enemigo1.tiempoFrame) {
-                enemigo1.frameActual = (enemigo1.frameActual + 1) % FRAMES_ENEMIGO1;
-                enemigo1.tiempoAnterior = tiempoActual;
-            }
-        } else if (SDL_GetTicks() > enemigo1.tiempoReaparicion) {
-            enemigo1.activo = 1;
-            enemigo1.x = 1024;
-            enemigo1.y = rand() % 600;
-        }
+        actualizar_enemigo1(enemigo1,tiempo_actual);
         
         // actualizacion de reaparicion de enemigo 2
         if (!enemigo2.activo && SDL_GetTicks() > enemigo2.tiempoReaparicion) {
@@ -384,7 +461,6 @@ int main(int argc, char *argv[]) {
 		SDL_RenderCopy(renderer, fondoTextura, NULL, NULL);
 		
 		// Punto de referencia
-		// Aquí es donde debes agregar el bloque del punto 4, antes de renderizar al jugador
 		
 		for (i = 0; i < MAX_DISPAROS; i++) {
     		if (disparosEnemigo2[i].activo) {
@@ -418,36 +494,78 @@ int main(int argc, char *argv[]) {
 		SDL_Rect srcRect = {frameActual * ANCHO_FRAME, animacionActual * ALTO_FRAME, ANCHO_FRAME, ALTO_FRAME};
 		SDL_Rect dstRect = {jugador.x, jugador.y, jugador.w, jugador.h};
 		SDL_RenderCopyEx(renderer, jugadorTextura, &srcRect, &dstRect, 0, NULL, flip);
-		
+		// comprobacion de colicion entre disparos y enemigos
 		for (i = 0; i < MAX_DISPAROS; i++) {
             if (disparos[i].activo) {
                 SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
                 SDL_RenderCopy(renderer, balaTextura, NULL, &rect_disparo);
-
-                SDL_Rect enemigo1Rect = {enemigo1.x, enemigo1.y, enemigo1.ancho, enemigo1.alto};
+				//comprobacion de interseccion entre enemigos tipo 1 y la bala
+				for (j=0; j<MAX_ENEMIGOS;j++){
+					if (enemigo1[j].activo) {
+						SDL_Rect enemigo1Rect = {enemigo1[j].x + 15, enemigo1[j].y + 20, 40, 40};
+						if (SDL_HasIntersection(&rect_disparo,&enemigo1Rect)){
+							enemigo1[j].vida-=1;
+							disparos[i].activo = 0;
+							if (enemigo1[j].vida <= 0){
+								enemigo1[j].activo = 0;
+                    			enemigo1[j].tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;
+                    			// Generar moneda en la posición del enemigo muerto
+								generar_moneda(monedas, enemigo1[j].x, enemigo1[j].y);	
+							}
+						}
+					}
+				}
+                
+				/*SDL_Rect enemigo1Rect = {enemigo1.x, enemigo1.y, enemigo1.ancho, enemigo1.alto};
                 if (enemigo1.activo && detectarColision(rect_disparo, enemigo1Rect)) {
                     disparos[i].activo = 0;
                     enemigo1.activo = 0;
                     enemigo1.tiempoReaparicion = SDL_GetTicks() + TIEMPO_REAPARICION_ENEMIGO;
-                }
-
+                }*/
+				
+				//comprobacion de colivion entre enemigos tipo 2 y la bala
+				
+                
+                if (enemigo1[j].activo) {
+					SDL_Rect enemigo2Rect = {enemigo2.x+15 , enemigo2.y + 20, 40, 40};
+						if (SDL_HasIntersection(&rect_disparo,&enemigo2Rect)){
+							disparos[i].activo = 0;
+                    		enemigo2.activo = 0;
+                    		enemigo2.tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;
+							
+						}
+					}
+				/*
                 SDL_Rect enemigo2Rect = {enemigo2.x, enemigo2.y, enemigo2.ancho, enemigo2.alto};
                 if (enemigo2.activo && detectarColision(rect_disparo, enemigo2Rect)) {
                     disparos[i].activo = 0;
                     enemigo2.activo = 0;
                     enemigo2.tiempoReaparicion = SDL_GetTicks() + TIEMPO_REAPARICION_ENEMIGO;
                 }
+                */
             }
         }
         
         
-        
+        // renderizado visual de enemigo1 activo, funciones utilizadas para renderizar con textura asociada, en este caso el zombie
+        for (i=0; i<MAX_ENEMIGOS ;i++){
+        	if (enemigo1[i].activo) {
+            SDL_Rect enemigo1SrcRect = {enemigo1[i].frameActual * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
+            SDL_Rect enemigo1DstRect = {enemigo1[i].x, enemigo1[i].y, enemigo1[i].ancho, enemigo1[i].alto};
+            SDL_RenderCopy(renderer, enemigo1Textura, &enemigo1SrcRect, &enemigo1DstRect);
+        }
+		
+		}
+		/* antes de moneda
+		
         if (enemigo1.activo) {
             SDL_Rect enemigo1SrcRect = {enemigo1.frameActual * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
             SDL_Rect enemigo1DstRect = {enemigo1.x, enemigo1.y, enemigo1.ancho, enemigo1.alto};
             SDL_RenderCopy(renderer, enemigo1Textura, &enemigo1SrcRect, &enemigo1DstRect);
         }
-
+		*/
+		
+		// renderizado para el mago y renderizados de su disparo si existe
         if (enemigo2.activo) {
     		SDL_Rect enemigo2SrcRect;
     
@@ -460,55 +578,99 @@ int main(int argc, char *argv[]) {
     		SDL_Rect enemigo2DstRect = {enemigo2.x, enemigo2.y, enemigo2.ancho, enemigo2.alto};
     		SDL_RenderCopy(renderer, enemigo2Textura, &enemigo2SrcRect, &enemigo2DstRect);
 		}
+		
 		// aqui sigue el tratamiento de intersecciones entre entidades, ademas un agregado de HITBOX visibles por propositos de depuracion
+		// aqui iran las acciones de interseccion entre enemigos contra el jugador
+		// ejemplos aplicables, disminucion de vida
+		// se comprueban todas las posibles situaciones de interseccion, segun la existencia o no del propio enemigo (si esta activo o no)
+		
+		SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
+		
+		for (i=0;i<MAX_ENEMIGOS;i++){
+			if (enemigo1[i].activo){
+				SDL_Rect enemigo1Rect = {enemigo1[i].x + 15, enemigo1[i].y + 20, 40, 40};
+				if (SDL_HasIntersection(&jugadorHitbox,&enemigo1Rect)){
+					//ejecuto acciones de DAÑO
+					mostrarVentanaEmergente();
+				}
+			}
+		}
+		if (enemigo2.activo){
+			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
+			if (SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
+				mostrarVentanaEmergente();			
+			}
+		}	
+		
+		//colicion/ interseccion entre jugador y moneda
+        for ( i = 0; i < MAX_MONEDAS; i++) {
+		    if (monedas[i].activo) {
+		        SDL_Rect moneda_rect = {monedas[i].x, monedas[i].y, monedas[i].ancho, monedas[i].alto};
+		        if (SDL_HasIntersection(&moneda_rect, &jugadorHitbox)) {
+		            // El jugador recoge la moneda
+		            monedas[i].activo = 0;  // Desactivar moneda
+		           // puntuacion += 10;       // Aumentar puntuación (puedes cambiar el valor si deseas)
+		            printf("se recogio la moneda");  // Mostrar puntuación en consola
+		        }
+		    }
+		}
+	/*	
 		if (enemigo1.activo && enemigo2.activo){
 			SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
 			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
 			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
 			if (SDL_HasIntersection(&jugadorHitbox, &enemigo1Rect) || SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
-				running = 0;
-				mostrarVentanaEmergente();
-				sleep (3000);			
+				mostrarVentanaEmergente();		
 			}
 		}else if (enemigo1.activo){
 			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
 			SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
 			if (SDL_HasIntersection(&jugadorHitbox, &enemigo1Rect)){
-				running = 0;
-				mostrarVentanaEmergente();
-				sleep (3000);			
+				mostrarVentanaEmergente();			
 			}	
 		}else if (enemigo2.activo){
 			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
 			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
 			if (SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
-				running = 0;
-				mostrarVentanaEmergente();
-				sleep (3000);			
+				mostrarVentanaEmergente();			
 			}
 		}
 		
-		        // Establece un color para los rectángulos de colisión (rojo)
-SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+		// HITBOX visible para depuracion
+		
+		// Establece un color para los rectángulos de colisión (rojo)
+			SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 
-// Dibuja el rectángulo de colisión del jugador
-SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
-SDL_RenderDrawRect(renderer, &jugadorHitbox);
+		// Dibuja el rectángulo de colisión del jugador
+			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
+			SDL_RenderDrawRect(renderer, &jugadorHitbox);
 
-// Dibuja el rectángulo de colisión de los enemigos si están activos
-if (enemigo1.activo) {
-    SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
-    SDL_RenderDrawRect(renderer, &enemigo1Rect);
-}
+		// Dibuja el rectángulo de colisión de los enemigos si están activos
+			if (enemigo1.activo) {
+			    SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
+    			SDL_RenderDrawRect(renderer, &enemigo1Rect);
+			}
 
-if (enemigo2.activo) {
-    SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
-    SDL_RenderDrawRect(renderer, &enemigo2Rect);
-}
+			if (enemigo2.activo) {
+    			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
+    			SDL_RenderDrawRect(renderer, &enemigo2Rect);
+			}
 
-// Restablece el color original para evitar afectar otros elementos
-SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Ajusta según tu color de fondo original
-  
+		// Restablece el color original para evitar afectar otros elementos
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Ajusta según tu color de fondo original
+  		
+  		//--
+  		*/
+  		
+  		// Renderizar monedas
+		SDL_SetRenderDrawColor(renderer, 255, 215, 0, 255); // Color dorado para las monedas
+		for ( i = 0; i < MAX_MONEDAS; i++) {
+		    if (monedas[i].activo) {
+		        SDL_Rect rect = {monedas[i].x, monedas[i].y, monedas[i].ancho, monedas[i].alto};
+		        SDL_RenderFillRect(renderer, &rect);
+		    }
+		}
+  		
 		SDL_RenderPresent(renderer);
         SDL_Delay(16);
         
