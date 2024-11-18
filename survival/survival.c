@@ -86,7 +86,7 @@ Uint32 tiempo_actual;
 #define MAX_DISPAROS 10
 #define MAX_MONEDAS 5
 #define MAX_ENEMIGOS 10
-
+#define VIDA_DEFAULT 6
 
 
 Disparo disparosEnemigo2[MAX_DISPAROS];
@@ -148,6 +148,31 @@ void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual){
 	}	
 }
 
+// Función para manejar daño al jugador
+    void recibir_dano(Jugador *player, int *game_over) {
+        if (player->salud > 0) {
+            player->salud--;
+            printf("¡Jugador recibió daño! Vida restante: %d\n", player->salud);
+        }
+        if (player->salud <= 0) {
+            printf("¡Juego terminado! Vida agotada.\n");
+            *game_over = 1; // Activar Game Over
+        }
+    }
+    
+ // Función para reiniciar el juego
+    void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over) {
+        int i = 0;
+		player->x = 640;
+        player->y = 300;
+        player->salud = VIDA_DEFAULT;
+        for (i = 0; i < MAX_DISPAROS; i++) {
+            disparos[i].activo = 0;
+        }
+        *game_over = 0;
+        printf("Juego reiniciado.\n");
+    }
+
 int main(int argc, char *argv[]) {
 	srand(time(NULL));  // Inicializar el generador de números aleatorios
     // Inicializar SDL y SDL_image
@@ -208,7 +233,7 @@ int main(int argc, char *argv[]) {
     }
     
     //inicializacion de registro o entidad jugador
-	Jugador player = {640, 300, 80, 80, 100, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant
+	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant
   	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
   	
 	 // Inicializar los disparos
@@ -255,9 +280,9 @@ int main(int argc, char *argv[]) {
      // Variables para el cooldown de disparo
     Uint32 ultimo_disparo = 0;
     Uint32 cooldown = 500; // 500 milisegundos
-    //Enemigo1 enemigo1 = {1000, 500, 80, 80, 1, 4, 0, 200, SDL_GetTicks(), 0};
     Enemigo2 enemigo2 = {1000, 300, 80, 80, 1, 3, 0, 200, SDL_GetTicks(), 0};
     
+    int game_over = 0; //nesesario para logica de restart 
     int frameActual = 0;
     int tiempoFrame = 100;
     Uint32 tiempoAnterior = SDL_GetTicks();
@@ -349,8 +374,42 @@ int main(int argc, char *argv[]) {
                                 }
                             }
                 		break;
+                	
+					case SDLK_k:// CURAR VIDA POR PROPOSITO DE DEPURACION Y EVOLUCION
+                		if (player.salud < VIDA_DEFAULT) {
+						        player.salud++;
+						        printf("¡Jugador se curó! Vida actual: %d\n", player.salud);
+						    } else {
+						    	// OJO SI SUBES LA CANTIDAD DE VIDA MAXIMA SERA NESCESARIO MAS LOGICA EN ESTE PUNTO; O MEJO DICHO EN TODA ESTA ESTRUCTURA
+						        printf("¡Vida al máximo! No se puede curar más.\n");
+						    }
+						    break;
+					
+					case SDLK_l: //realizarce daño para proposito de depuracion
+						recibir_dano(&player,&game_over);
+						break;
+                 
                 }
-            }
+            }else if (evento.type == SDL_MOUSEBUTTONDOWN && game_over){
+            	int mouse_x, mouse_y;
+                SDL_GetMouseState(&mouse_x, &mouse_y);
+
+                int menu_x = 540, menu_y = 200;
+                int boton_ancho = 200, boton_alto = 60;
+
+                SDL_Rect boton_reintentar = {menu_x, menu_y, boton_ancho, boton_alto};
+                SDL_Rect boton_cerrar = {menu_x, menu_y + 80, boton_ancho, boton_alto};
+                
+                // logica para cerrar y reiniciar la app segun ubicacion y accion de el raton
+                
+                if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_reintentar)) {
+                    reiniciar_juego(&player, disparos, &game_over);
+                }
+                
+				if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_cerrar)) {
+                    running = 0;
+                }
+			}
         }
         
         
@@ -614,53 +673,6 @@ int main(int argc, char *argv[]) {
 		        }
 		    }
 		}
-	/*	
-		if (enemigo1.activo && enemigo2.activo){
-			SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
-			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
-			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
-			if (SDL_HasIntersection(&jugadorHitbox, &enemigo1Rect) || SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
-				mostrarVentanaEmergente();		
-			}
-		}else if (enemigo1.activo){
-			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
-			SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
-			if (SDL_HasIntersection(&jugadorHitbox, &enemigo1Rect)){
-				mostrarVentanaEmergente();			
-			}	
-		}else if (enemigo2.activo){
-			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
-			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
-			if (SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
-				mostrarVentanaEmergente();			
-			}
-		}
-		
-		// HITBOX visible para depuracion
-		
-		// Establece un color para los rectángulos de colisión (rojo)
-			SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-
-		// Dibuja el rectángulo de colisión del jugador
-			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
-			SDL_RenderDrawRect(renderer, &jugadorHitbox);
-
-		// Dibuja el rectángulo de colisión de los enemigos si están activos
-			if (enemigo1.activo) {
-			    SDL_Rect enemigo1Rect = {enemigo1.x + 15, enemigo1.y + 20, 40, 40};
-    			SDL_RenderDrawRect(renderer, &enemigo1Rect);
-			}
-
-			if (enemigo2.activo) {
-    			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
-    			SDL_RenderDrawRect(renderer, &enemigo2Rect);
-			}
-
-		// Restablece el color original para evitar afectar otros elementos
-		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Ajusta según tu color de fondo original
-  		
-  		//--
-  		*/
   		
   		// Renderizar monedas
 		SDL_SetRenderDrawColor(renderer, 255, 215, 0, 255); // Color dorado para las monedas
@@ -670,6 +682,26 @@ int main(int argc, char *argv[]) {
 		        SDL_RenderFillRect(renderer, &rect);
 		    }
 		}
+		
+		// renderizado de Indicador de vida
+        for (i = 0; i < player.salud; i++) {
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            SDL_Rect vida_rect = {10 + i * 30, 10, 20, 20};
+            if (i >= player.salud) {
+                SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
+            }
+            SDL_RenderFillRect(renderer, &vida_rect);
+        }
+  		
+  		// Mostrar menú de Game Over
+        if (game_over) {
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL_Rect boton_reintentar = {540, 200, 200, 60};
+            SDL_Rect boton_cerrar = {540, 280, 200, 60};
+            SDL_RenderDrawRect(renderer, &boton_reintentar);
+            SDL_RenderDrawRect(renderer, &boton_cerrar);
+        }
+  		
   		
 		SDL_RenderPresent(renderer);
         SDL_Delay(16);
