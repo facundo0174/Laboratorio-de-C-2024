@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <time.h>
+#include <SDL_ttf.h>
 
 void mostrarVentanaEmergente() {
     printf("hitbox detectado, has sido dañado");
@@ -161,15 +162,42 @@ void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual){
     }
     
  // Función para reiniciar el juego
-    void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over) {
+    void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2) {
         int i = 0;
 		player->x = 640;
         player->y = 300;
+        player->dinero = 0;
         player->salud = VIDA_DEFAULT;
         for (i = 0; i < MAX_DISPAROS; i++) {
             disparos[i].activo = 0;
         }
         *game_over = 0;
+        
+        for (i = 0; i < MAX_ENEMIGOS; i++) {
+        enemigo1[i].x = 1200; // Posición inicial aleatoria
+        enemigo1[i].y = rand() % (750 - 300);
+        enemigo1[i].ancho = 80;       // Ancho predeterminado
+        enemigo1[i].alto = 80;        // Alto predeterminado
+        enemigo1[i].activo = 1;       // Activo al inicio
+        enemigo1[i].velocidad_x = 3; // Velocidad
+        enemigo1[i].frameActual=0;
+        enemigo1[i].tiempoFrame=200;
+        enemigo1[i].tiempoAnterior=SDL_GetTicks();
+        enemigo1[i].tiempoReaparicion=1000; 
+        enemigo1[i].vida = 3;
+    	}
+    	
+    	enemigo2->x = 1000;
+    	enemigo2->y = 300;
+    	enemigo2->ancho = 80;
+    	enemigo2->alto = 80;
+    	enemigo2->activo = 1;
+    	enemigo2->velocidad_x = 3;
+    	enemigo2->frameActual = 0;
+    	enemigo2->tiempoFrame = 200;
+    	enemigo2->tiempoAnterior = SDL_GetTicks();
+    	enemigo2->tiempoReaparicion = 0;
+    	
         printf("Juego reiniciado.\n");
     }
 
@@ -181,10 +209,17 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
+    //inicializar SDL_image
     if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
         printf("No se pudo inicializar SDL_image: %s\n", IMG_GetError());
         SDL_Quit();
         return 1;
+    }
+    
+    //inicializar SDL_ttf
+    if (TTF_Init() == -1) {
+        printf("Error inicializando SDL_ttf: %s\n", TTF_GetError());
+        return -1;
     }
 
     // Crear una ventana, 1280 para notebook, 1024 normal, 800 peque, el alto 600 esta al limite mas o menos
@@ -195,6 +230,7 @@ int main(int argc, char *argv[]) {
     //tratamiento de exepcion
 	if (!ventana){
         printf("No se pudo crear la ventana: %s\n", SDL_GetError());
+        TTF_Quit();
         SDL_Quit();
         return 1;
     }
@@ -210,9 +246,25 @@ int main(int argc, char *argv[]) {
     if (!renderer) {
         printf("No se pudo crear el renderer: %s\n", SDL_GetError());
         SDL_DestroyWindow(ventana);
+        TTF_Quit();
         SDL_Quit();
         return 1;
     }
+    
+    //carga de la fuente de letra
+    TTF_Font *fuente = TTF_OpenFont("fuente/SHPinscher-Regular.otf", 24);
+    
+    if (!fuente) {
+        printf("Error cargando fuente: %s\n", TTF_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        TTF_Quit();
+        SDL_Quit();
+        return -1;
+    }
+    
+    // Color del texto (dorado)
+    SDL_Color colorTexto = {255, 215, 0, 255};
 
 	// Cargar texturas de los personajes, enemigos y proyectiles
     SDL_Texture *jugadorTextura = IMG_LoadTexture(renderer, "sprites/personaje2.png");
@@ -233,7 +285,7 @@ int main(int argc, char *argv[]) {
     }
     
     //inicializacion de registro o entidad jugador
-	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant
+	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant, dinero
   	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
   	
 	 // Inicializar los disparos
@@ -403,7 +455,7 @@ int main(int argc, char *argv[]) {
                 // logica para cerrar y reiniciar la app segun ubicacion y accion de el raton
                 
                 if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_reintentar)) {
-                    reiniciar_juego(&player, disparos, &game_over);
+                    reiniciar_juego(&player, disparos, &game_over, enemigo1,&enemigo2);
                 }
                 
 				if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_cerrar)) {
@@ -670,6 +722,8 @@ int main(int argc, char *argv[]) {
 		            monedas[i].activo = 0;  // Desactivar moneda
 		           // puntuacion += 10;       // Aumentar puntuación (puedes cambiar el valor si deseas)
 		            printf("se recogio la moneda");  // Mostrar puntuación en consola
+		            player.dinero++;
+		            
 		        }
 		    }
 		}
@@ -702,6 +756,25 @@ int main(int argc, char *argv[]) {
             SDL_RenderDrawRect(renderer, &boton_cerrar);
         }
   		
+  		// mostar dinero con sdl_ttf
+  		// se define y convierte a caracter o string lo que se quiera mostrar OBLIGADAMENTE
+        char texto[50];
+        snprintf(texto, sizeof(texto), "Dinero: %d", player.dinero);
+        
+         // Renderizar el texto dinámico
+        SDL_Surface* superficieTexto = TTF_RenderText_Solid(fuente, texto, colorTexto);
+        SDL_Texture* texturaTexto = SDL_CreateTextureFromSurface(renderer, superficieTexto);
+        
+  		// posición y tamaño del texto, como se asemeja al tratamiento de una textura, realizamos un rectangulo para "rellenar" con el texto y moverlo a donde queramos
+        SDL_Rect rectTexto;
+        rectTexto.x = 960;  // Coordenada X
+        rectTexto.y = 5;  // Coordenada Y
+        rectTexto.w = superficieTexto->w; // Ancho del texto
+        rectTexto.h = superficieTexto->h; // Alto del texto
+        SDL_FreeSurface(superficieTexto); // Liberar superficie después de crear la textura
+        // Dibujar el texto
+        SDL_RenderCopy(renderer, texturaTexto, NULL, &rectTexto);
+        SDL_DestroyTexture(texturaTexto);
   		
 		SDL_RenderPresent(renderer);
         SDL_Delay(16);
@@ -716,8 +789,10 @@ int main(int argc, char *argv[]) {
     SDL_DestroyTexture(enemigo1Textura);
     SDL_DestroyTexture(enemigo2Textura);
     SDL_DestroyTexture(jugadorTextura);
+    TTF_CloseFont(fuente);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(ventana);
+    TTF_Quit();
     IMG_Quit();
     SDL_Quit();
 
