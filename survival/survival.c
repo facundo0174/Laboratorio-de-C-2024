@@ -64,6 +64,14 @@ typedef struct {
     int activo;             // Si la moneda está en pantalla
 } Moneda;
 
+typedef struct {
+    int numero_oleada;        // oleadas faltantes
+    int oleada_maxima         // maximo de oleada
+    int enemigos_activos;     // enemigos vivos en pantalla
+    Uint32 tiempo_restante;   // Tiempo restante para la oleada (en ms)
+    Uint32 tiempo_transicion; // Tiempo entre oleadas (en ms)
+    int en_transicion;        // 1 si está en transición, 0 si está en oleada activa
+} Oleada;
 
 
 Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
@@ -83,12 +91,11 @@ Uint32 tiempo_actual;
 #define FRAMES_ENEMIGO1 4
 #define FRAMES_ENEMIGO2 3
 #define VELOCIDAD_DISPARO 10
-#define TIEMPO_REAPARICION_ENEMIGO 2000 // Tiempo de reaparición del enemigo en ms
+#define TIEMPO_REAPARICION_ENEMIGO 3000 // Tiempo de reaparición del enemigo en ms
 #define MAX_DISPAROS 10
 #define MAX_MONEDAS 5
 #define MAX_ENEMIGOS 10
 #define VIDA_DEFAULT 6
-
 
 Disparo disparosEnemigo2[MAX_DISPAROS];
 // Enumeración para controlar el tipo de animación
@@ -109,9 +116,44 @@ int detectarColision(SDL_Rect a, SDL_Rect b) {
     return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
 }
 
-int puntuacion = 0;  // Puntuación del jugador
 int i;
 int j;
+
+void iniciar_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
+	oleada_actual->numero_oleada++
+    oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
+    oleada_actual->enemigos_activos = 0;
+    oleada_actual->tiempo_restante = 30000; // 30 segundos en milisegundos
+    oleada_actual->tiempo_transicion = 10000; // 5 segundos de transición/descanso entre oleadas
+    oleada_actual->en_transicion = 0;
+    
+    for (i = 0; i < MAX_ENEMIGOS; i++) {
+        enemigo1[i].x = 1200; // Posición inicial aleatoria
+        enemigo1[i].y = rand() % (750 - 300);
+        enemigo1[i].ancho = 80;       // Ancho predeterminado
+        enemigo1[i].alto = 80;        // Alto predeterminado
+        enemigo1[i].activo = 0;       // Activo al inicio
+        enemigo1[i].velocidad_x = 2; // Velocidad
+        enemigo1[i].frameActual=0;
+        enemigo1[i].tiempoFrame=200;
+        enemigo1[i].tiempoAnterior=SDL_GetTicks();
+        enemigo1[i].tiempoReaparicion=enemigo1[i]->tiempoAnterior + TIEMPO_REAPARICION_ENEMIGO ; 
+        enemigo1[i].vida = 2;
+        oleada_actual->enemigos_activos ++;
+        
+    }
+}
+
+void actualizar_cronometro(Oleada *oleada_actual, Uint32 delta_tiempo) {
+    if (!oleada_actual->en_transicion) {
+        if (oleada_actual->tiempo_restante > delta_tiempo) {
+            oleada_actual->tiempo_restante -= delta_tiempo; // Resta el tiempo transcurrido
+        } else {
+            oleada_actual->tiempo_restante = 0; // Evitar valores negativos
+        }
+    }
+}
+
 
 void generar_moneda(Moneda monedas[MAX_MONEDAS], int x, int y) {
     for ( i = 0; i < MAX_MONEDAS; i++) {
@@ -126,7 +168,7 @@ void generar_moneda(Moneda monedas[MAX_MONEDAS], int x, int y) {
     }
 }
 
-void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual){
+void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual, Oleada *oleada_actual){
 	int i =0;
 	for (i=0; i<MAX_ENEMIGOS; i++){
 		if (enemigo1[i].activo){
@@ -139,18 +181,20 @@ void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual){
                 enemigo1[i].frameActual = (enemigo1[i].frameActual + 1) % FRAMES_ENEMIGO1;
                 enemigo1[i].tiempoAnterior = tiempo_actual;
 			}
-		}else if (tiempo_actual > enemigo1[i].tiempoReaparicion) {
+		}else if ((tiempo_actual > enemigo1[i].tiempoReaparicion) && (oleada->actual > 0)) {
+		//si no esta activo, pregunta por condiciones de reaparicion y lo ejecuta si cumple, si el cronometro termino, dejo de spawnear enemigos
             	enemigo1[i].activo = 1;
             	enemigo1[i].vida = 3;
             	enemigo1[i].x = 1200; 
         		enemigo1[i].y = rand() % (750 - 300);
+        		oleada_actual->enemigos_activos++;
 		}
 		
 	}	
 }
 
 // Función para manejar daño al jugador
-    void recibir_dano(Jugador *player, int *game_over) {
+void recibir_dano(Jugador *player, int *game_over) {
         if (player->salud > 0) {
             player->salud--;
             printf("¡Jugador recibió daño! Vida restante: %d\n", player->salud);
@@ -162,7 +206,7 @@ void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual){
     }
     
  // Función para reiniciar el juego
-    void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2) {
+void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2) {
         int i = 0;
 		player->x = 640;
         player->y = 300;
@@ -178,15 +222,15 @@ void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual){
         enemigo1[i].y = rand() % (750 - 300);
         enemigo1[i].ancho = 80;       // Ancho predeterminado
         enemigo1[i].alto = 80;        // Alto predeterminado
-        enemigo1[i].activo = 1;       // Activo al inicio
-        enemigo1[i].velocidad_x = 3; // Velocidad
+        enemigo1[i].activo = 0;       // Activo al inicio
+        enemigo1[i].velocidad_x = 2; // Velocidad
         enemigo1[i].frameActual=0;
         enemigo1[i].tiempoFrame=200;
         enemigo1[i].tiempoAnterior=SDL_GetTicks();
-        enemigo1[i].tiempoReaparicion=1000; 
-        enemigo1[i].vida = 3;
+        enemigo1[i].tiempoReaparicion=enemigo1[i].tiempoAnterior+TIEMPO_REAPARICION_ENEMIGO; 
+        enemigo1[i].vida = 2;
     	}
-    	
+    	//falta reiniciar la oleada
     	enemigo2->x = 1000;
     	enemigo2->y = 300;
     	enemigo2->ancho = 80;
@@ -200,6 +244,54 @@ void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual){
     	
         printf("Juego reiniciado.\n");
     }
+
+// Verificar fin de oleada
+int verificar_fin_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
+    if (oleada_actual->tiempo_restante == 0) {
+        for (i = 0; i < MAX_ENEMIGOS; i++) {
+            if (enemigo1[i].activo) {
+                return 0; // Aún hay enemigos activos
+            }
+        }
+        return 1; // Todos los enemigos están inactivos
+    }
+    return 0; // Tiempo restante
+}
+
+void manejar_transicion(Oleada *oleada_actual, Uint32 delta_tiempo,Enemigo1 enemigo1[]) {
+    if (oleada_actual->tiempo_transicion > delta_tiempo) {
+        oleada_actual->tiempo_transicion -= delta_tiempo;
+        printf("Transición activa. Tiempo restante: %d ms\n", oleada_actual->tiempo_transicion);
+    } else {
+        printf("Transición terminada. Iniciando siguiente oleada.\n");
+        oleada_actual->en_transicion = 0;
+
+        if (oleada_actual->numero_oleada <= oleada_actual->oleada_maxima) {
+        	oleada_actual->numero_oleada++;
+        	oleada_actual->tiempo_restante=30000 //vuelvo a poner 30 segundos
+        	oleada_actual->tiempo_transicion=15000 // vuelvo a colocar 15 segundos de descaso entre oleadas
+        	 oleada_actual->enemigos_activos = 0;
+        	 
+        	 for (i = 0; i < MAX_ENEMIGOS; i++) {
+        		enemigo1[i].x = 1200; // Posición inicial
+        		enemigo1[i].y = rand() % (750 - 300);
+        		enemigo1[i].ancho = 80;       // Ancho predeterminado
+        		enemigo1[i].alto = 80;        // Alto predeterminado
+        		enemigo1[i].activo = 0;       // Activo al inicio
+        		enemigo1[i].velocidad_x = 2; // Velocidad
+        		enemigo1[i].frameActual=0;
+        		enemigo1[i].tiempoFrame=200;
+        		enemigo1[i].tiempoAnterior=SDL_GetTicks();
+        		enemigo1[i].tiempoReaparicion=enemigo1[i]->tiempoAnterior + TIEMPO_REAPARICION_ENEMIGO ; 
+        		enemigo1[i].vida = 2;
+        		oleada_actual->enemigos_activos ++;
+        	}
+        } else {// o paso dia->atardecer | atardecer->noche | noche->amanecer | amanecer->dia 
+            // aca iria el tratamiento para la siguiente transicion del dia, por ejemplo la tarde y que pasara de fondo y habilite la tienda
+            // pongo el booleano o contador del momento del dia en verdadero o falso, y veo que prosigue
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
 	srand(time(NULL));  // Inicializar el generador de números aleatorios
@@ -292,6 +384,9 @@ int main(int argc, char *argv[]) {
     Disparo disparos[MAX_DISPAROS];
     Moneda monedas[MAX_MONEDAS];
     Enemigo1 enemigo1[MAX_ENEMIGOS];
+    Oleada oleada_actual; // creo variable registro
+    oleada_actual.numero_oleada=0;
+    iniciar_oleada(&oleada_actual,enemigo1); //inicializo oleada
     
     int i= 0;
     for ( i = 0; i < MAX_DISPAROS; i++) {
@@ -306,20 +401,6 @@ int main(int argc, char *argv[]) {
 		monedas[i].activo = 0;
 	} 
 	
-	for (i = 0; i < MAX_ENEMIGOS; i++) {
-        enemigo1[i].x = 1200; // Posición inicial aleatoria
-        enemigo1[i].y = rand() % (750 - 300);
-        enemigo1[i].ancho = 80;       // Ancho predeterminado
-        enemigo1[i].alto = 80;        // Alto predeterminado
-        enemigo1[i].activo = 1;       // Activo al inicio
-        enemigo1[i].velocidad_x = 3; // Velocidad
-        enemigo1[i].frameActual=0;
-        enemigo1[i].tiempoFrame=200;
-        enemigo1[i].tiempoAnterior=SDL_GetTicks();
-        enemigo1[i].tiempoReaparicion=1000; 
-        enemigo1[i].vida = 3;
-    }
-    
     /* //lo siguiente es controlado al momento de la creacion de la entidad en el caso de la velocidad, el intervalo quedara en veremos
 
     // Variables para aparición continua de enemigos
@@ -333,7 +414,6 @@ int main(int argc, char *argv[]) {
     Uint32 ultimo_disparo = 0;
     Uint32 cooldown = 500; // 500 milisegundos
     Enemigo2 enemigo2 = {1000, 300, 80, 80, 1, 3, 0, 200, SDL_GetTicks(), 0};
-    
     int game_over = 0; //nesesario para logica de restart 
     int frameActual = 0;
     int tiempoFrame = 100;
@@ -343,23 +423,24 @@ int main(int argc, char *argv[]) {
     Animacion animacionActual = REPOSO;
     Uint32 tiempoInicioDisparo = 0;
     int duracionAnimacionDisparo = 400;
-
+	Uint32 tiempo_anterior = SDL_GetTicks();
+	
    // Bucle de eventos para mantener la ventana abierta
    
     int running = 1; //variable identificatoria para realizar bucle de muestreo/actualizacion hasta que el usuario intervenga
-    SDL_Event evento;//asigno un nombre a los tipos de eventos que reacciona SDL_event, alli pararían todos los eventos por raton o teclado recolectados
+	SDL_Event evento;//asigno un nombre a los tipos de eventos que reacciona SDL_event, alli pararían todos los eventos por raton o teclado recolectados
     // los eventos pueden ser de raton, teclado o joystick, todos tienen palabras reservadas down y up, referenciando la accion de apretar y soltar respectivamente
     // se debe configurar ambos de lo contrario la accion se volvera perpetua
-   int velocidad = 5; //velocidad traducida en 5 pixeles por bucle segun x accion de desplazamiento en cada eje
-   //int ultima_direccion_x = 1;
-   //int ultima_direccion_y = 0;
-   Disparo disparo = {0, 0, 6, 2, 0, 0, 0}; // inicializamos la entidad disparo desactivada, los parametros son correspondientes y posicionales al struct
+	int velocidad = 5; //velocidad traducida en 5 pixeles por bucle segun x accion de desplazamiento en cada eje
+	Disparo disparo = {0, 0, 6, 2, 0, 0, 0}; // inicializamos la entidad disparo desactivada, los parametros son correspondientes y posicionales al struct
    
     while (running) {
         // Procesar eventos
         // SDL_PollEvent es algo asi como un CACHE de eventos captados por la "ventana" renderizada por SDL
         enMovimiento = 0;
         tiempo_actual = SDL_GetTicks();
+        Uint32 delta_tiempo = tiempo_actual - tiempo_anterior;
+    	tiempo_anterior = tiempo_actual;
         
         //bucle administrador de eventos
         while (SDL_PollEvent(&evento)) {
@@ -462,10 +543,166 @@ int main(int argc, char *argv[]) {
                     running = 0;
                 }
 			}
+        }//termina adm eventos
+        
+        //logica del juego, act de enemigos y disparos
+        
+         if (oleada_actual.en_transicion) {// tiempo para recoger monedas en caso de no llegar a la oleada final, si se llego hacer cambio de fondos
+            manejar_transicion(&oleada_actual, delta_tiempo); 
+        } else { // si no es una transicion o intermedio, estas en una oleada
+            actualizar_cronometro(&oleada_actual, delta_tiempo);
+            actualizar_enemigo1(enemigo1,tiempo_actual,&oleada_actual);
+            
+            // actualizacion de reaparicion de enemigo 2
+        	if (!enemigo2.activo && SDL_GetTicks() > enemigo2.tiempoReaparicion) {
+	    		printf("Reapareciendo enemigo 2\n"); // Mensaje de depuración
+    			enemigo2.activo = 1;
+    			enemigo2.x = 1024;
+    			enemigo2.y = rand() % 600;
+    			atacandoEnemigo2 = 0;
+    			enemigo2.frameActual = 0;
+			}
+		
+			//logica de animacion y ataque automatico de enemigo 2, el cual ataca a distancia
+		
+			if (enemigo2.activo) {
+    			// Movimiento del enemigo
+    			if (!atacandoEnemigo2) {
+	        		enemigo2.x -= enemigo2.velocidad_x;
+    			}
+
+	    		if (!atacandoEnemigo2 && enemigo2.x < 1024 * (1 - LIMITE_ATAQUE_X)) {
+    	    		atacandoEnemigo2 = 1;
+        			tiempoAtaqueEnemigo2 = SDL_GetTicks();
+        			enemigo2.frameActual = 0;
+    			}
+				//logica de disparos de enemigo 2
+    			if (atacandoEnemigo2) {
+			        if (SDL_GetTicks() > enemigo2.tiempoAnterior + enemigo2.tiempoFrame) {
+	    		        enemigo2.frameActual = (enemigo2.frameActual + 1) % FRAMES_ATAQUE_ENEMIGO2;
+	        		    enemigo2.tiempoAnterior = SDL_GetTicks();
+	        		}	
+			
+		        	if (SDL_GetTicks() > tiempoAtaqueEnemigo2 + cooldownAtaqueEnemigo2) {
+	    	        	for (i = 0; i < MAX_DISPAROS; i++) {
+	        	        	if (!disparosEnemigo2[i].activo) {
+	            	        	disparosEnemigo2[i].activo = 1;
+        	        	    	disparosEnemigo2[i].x = enemigo2.x;
+    	                		disparosEnemigo2[i].y = enemigo2.y + enemigo2.alto / 2;
+	        	            	disparosEnemigo2[i].ancho = 32;
+    	        	        	disparosEnemigo2[i].alto = 32;
+        	        	    	disparosEnemigo2[i].direccion_x = -1;
+            	        		tiempoAtaqueEnemigo2 = SDL_GetTicks();
+                	    		break;
+                			}
+		            	}
+    		    	}
+	    		} else {//actualizacion de contador para realizar frames de animaciones
+    				if (SDL_GetTicks() > enemigo2.tiempoAnterior + enemigo2.tiempoFrame) {
+	    	        enemigo2.frameActual = (enemigo2.frameActual + 1) % FRAMES_ENEMIGO2;
+    	    	    enemigo2.tiempoAnterior = SDL_GetTicks();
+	        		}
+    			}
+    	
+		    	//si la figura del enemigo exede cierto valor de pantalla, se desactiva
+    			if (enemigo2.x < -enemigo2.ancho) {
+			        printf("Desactivando enemigo 2\n"); // Mensaje de depuración
+	        		enemigo2.activo = 0;
+	        		atacandoEnemigo2 = 0;
+		        	enemigo2.tiempoReaparicion = SDL_GetTicks() + TIEMPO_REAPARICION_ENEMIGO;
+		    	}
+	    	}
+			
+			for (i = 0; i < MAX_DISPAROS; i++) {
+    			if (disparosEnemigo2[i].activo) {
+	        		disparosEnemigo2[i].x += disparosEnemigo2[i].direccion_x * VELOCIDAD_PROYECTIL_ENEMIGO2;
+	        	
+					// Desactivar el proyectil si sale de la pantalla
+    	   		
+					if (disparosEnemigo2[i].x < 0 || disparosEnemigo2[i].x > 1024) {
+    	    	    	disparosEnemigo2[i].activo = 0;
+		        	}
+	        
+		        	// Renderizar el proyectil
+			        SDL_Rect proyectilRect = {disparosEnemigo2[i].x, disparosEnemigo2[i].y, disparosEnemigo2[i].ancho, disparosEnemigo2[i].alto};
+					proyectilRect.w = 64; // Ancho deseado
+        			proyectilRect.h = 64;
+					// Asume que el proyectil tiene varias frames horizontales en el spritesheet
+					int frameProyectil = (SDL_GetTicks() / 100) % FRAMES_PROYECTIL_ENEMIGO2;  // Ajusta 100 para cambiar la velocidad de animación
+					SDL_Rect srcProyectilEnemigo2 = {frameProyectil * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
+					SDL_RenderCopy(renderer, proyectilEnemigo2Textura, &srcProyectilEnemigo2, &proyectilRect);
+        		}
+			}
+			
+			// comprobacion de colicion entre disparos y enemigos
+			for (i = 0; i < MAX_DISPAROS; i++) {
+            	if (disparos[i].activo) {
+	                SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
+    	            SDL_RenderCopy(renderer, balaTextura, NULL, &rect_disparo);
+					//comprobacion de interseccion entre enemigos tipo 1 y la bala
+					for (j=0; j<MAX_ENEMIGOS;j++){
+						if (enemigo1[j].activo) {
+							SDL_Rect enemigo1Rect = {enemigo1[j].x + 15, enemigo1[j].y + 20, 40, 40};
+							if (SDL_HasIntersection(&rect_disparo,&enemigo1Rect)){
+								enemigo1[j].vida-=1;
+								disparos[i].activo = 0;
+								if (enemigo1[j].vida <= 0){
+									enemigo1[j].activo = 0;
+                    				enemigo1[j].tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;
+                    				// Generar moneda en la posición del enemigo muerto
+									generar_moneda(monedas, enemigo1[j].x, enemigo1[j].y);	
+									oleada_actual.enemigos_activos--;
+								}
+							}
+						}
+					}
+                				
+					//comprobacion de colivion entre enemigos tipo 2 y la bala
+				
+	                if (enemigo2.activo) {
+						SDL_Rect enemigo2Rect = {enemigo2.x+15 , enemigo2.y + 20, 40, 40};
+							if (SDL_HasIntersection(&rect_disparo,&enemigo2Rect)){
+								disparos[i].activo = 0;
+                	    		enemigo2.activo = 0;
+                    			enemigo2.tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;								
+							}
+					}
+            	}
+        	}
+			
+			// aqui iran las acciones de interseccion entre enemigos contra el jugador
+				
+			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
+			
+			for (i=0;i<MAX_ENEMIGOS;i++){// interseccion con enemigo 1
+				if (enemigo1[i].activo){
+					SDL_Rect enemigo1Rect = {enemigo1[i].x + 15, enemigo1[i].y + 20, 40, 40};
+					if (SDL_HasIntersection(&jugadorHitbox,&enemigo1Rect)){
+						//ejecuto acciones de DAÑO
+						mostrarVentanaEmergente();
+					}
+				}
+			}
+			
+			if (enemigo2.activo){ //interseccion con enemigo 2
+				SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
+				if (SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
+					mostrarVentanaEmergente();			
+				}
+			}	
+
+		
+            if (verificar_fin_oleada(&oleada_actual, enemigos)) { //devuelve 1 si y solo si enemigos restantes = 0 y termino los 30 segundos de oleada
+                oleada_actual.en_transicion = 1;
+                oleada_actual.tiempo_transicion = 15000; // 15 segundos
+                if (oleada_actual.numero_oleada <= (oleada_actual.oleada_maxima)){ // compuebo si no supero la oleada final, sino aumento +1
+                	oleada_actual.numero_oleada++;	
+				}
+            }
         }
         
-        
-        
+        // renderizados etc abajo
+       
         // Control de animaciones del jugador
         if (animacionActual == DISPARO && SDL_GetTicks() > tiempoInicioDisparo + duracionAnimacionDisparo) {
             animacionActual = REPOSO;
@@ -494,9 +731,7 @@ int main(int argc, char *argv[]) {
 		    }
 		}
 
-
-
-        // Movimiento de disparos
+        // Movimiento de disparos jugador
         for (i = 0; i < MAX_DISPAROS; i++) {
             if (disparos[i].activo) {
                 disparos[i].x += disparos[i].direccion_x * VELOCIDAD_DISPARO;
@@ -505,95 +740,9 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        
-        // actualizacion de enemigo 1
-        actualizar_enemigo1(enemigo1,tiempo_actual);
-        
-        // actualizacion de reaparicion de enemigo 2
-        if (!enemigo2.activo && SDL_GetTicks() > enemigo2.tiempoReaparicion) {
-    		printf("Reapareciendo enemigo 2\n"); // Mensaje de depuración
-    		enemigo2.activo = 1;
-    		enemigo2.x = 1024;
-    		enemigo2.y = rand() % 600;
-    		atacandoEnemigo2 = 0;
-    		enemigo2.frameActual = 0;
-		}
-		
-		//logica de animacion y ataque automatico de enemigo 2, el cual ataca a distancia
-		
-		if (enemigo2.activo) {
-    		// Movimiento del enemigo
-    		if (!atacandoEnemigo2) {
-        		enemigo2.x -= enemigo2.velocidad_x;
-    		}
-
-    		if (!atacandoEnemigo2 && enemigo2.x < 1024 * (1 - LIMITE_ATAQUE_X)) {
-        		atacandoEnemigo2 = 1;
-        		tiempoAtaqueEnemigo2 = SDL_GetTicks();
-        		enemigo2.frameActual = 0;
-    		}
-			//logica de disparos de enemigo 2
-    		if (atacandoEnemigo2) {
-		        if (SDL_GetTicks() > enemigo2.tiempoAnterior + enemigo2.tiempoFrame) {
-    		        enemigo2.frameActual = (enemigo2.frameActual + 1) % FRAMES_ATAQUE_ENEMIGO2;
-        		    enemigo2.tiempoAnterior = SDL_GetTicks();
-        		}	
-		
-	        	if (SDL_GetTicks() > tiempoAtaqueEnemigo2 + cooldownAtaqueEnemigo2) {
-    	        	for (i = 0; i < MAX_DISPAROS; i++) {
-        	        	if (!disparosEnemigo2[i].activo) {
-            	        	disparosEnemigo2[i].activo = 1;
-                	    	disparosEnemigo2[i].x = enemigo2.x;
-                    		disparosEnemigo2[i].y = enemigo2.y + enemigo2.alto / 2;
-	                    	disparosEnemigo2[i].ancho = 32;
-    	                	disparosEnemigo2[i].alto = 32;
-        	            	disparosEnemigo2[i].direccion_x = -1;
-            	        	tiempoAtaqueEnemigo2 = SDL_GetTicks();
-                	    	break;
-                		}
-	            	}
-    	    	}
-    		} else {//actualizacion de contador para realizar frames de animaciones
-    			if (SDL_GetTicks() > enemigo2.tiempoAnterior + enemigo2.tiempoFrame) {
-	            enemigo2.frameActual = (enemigo2.frameActual + 1) % FRAMES_ENEMIGO2;
-    	        enemigo2.tiempoAnterior = SDL_GetTicks();
-        		}
-    		}
-    	
-	    	//si la figura del enemigo exede cierto valor de pantalla, se desactiva
-    		if (enemigo2.x < -enemigo2.ancho) {
-		        printf("Desactivando enemigo 2\n"); // Mensaje de depuración
-	        	enemigo2.activo = 0;
-	        	atacandoEnemigo2 = 0;
-	        	enemigo2.tiempoReaparicion = SDL_GetTicks() + TIEMPO_REAPARICION_ENEMIGO;
-	    	}
-    	}
-		
+	
 		SDL_RenderCopy(renderer, fondoTextura, NULL, NULL);
-		
-		// Punto de referencia
-		
-		for (i = 0; i < MAX_DISPAROS; i++) {
-    		if (disparosEnemigo2[i].activo) {
-        		disparosEnemigo2[i].x += disparosEnemigo2[i].direccion_x * VELOCIDAD_PROYECTIL_ENEMIGO2;
-	        	
-				// Desactivar el proyectil si sale de la pantalla
-    	   		
-				if (disparosEnemigo2[i].x < 0 || disparosEnemigo2[i].x > 1024) {
-        	    	disparosEnemigo2[i].activo = 0;
-	        	}
-	        
-	        	// Renderizar el proyectil
-		        SDL_Rect proyectilRect = {disparosEnemigo2[i].x, disparosEnemigo2[i].y, disparosEnemigo2[i].ancho, disparosEnemigo2[i].alto};
-				proyectilRect.w = 64; // Ancho deseado
-        		proyectilRect.h = 64;
-				// Asume que el proyectil tiene varias frames horizontales en el spritesheet
-				int frameProyectil = (SDL_GetTicks() / 100) % FRAMES_PROYECTIL_ENEMIGO2;  // Ajusta 100 para cambiar la velocidad de animación
-				SDL_Rect srcProyectilEnemigo2 = {frameProyectil * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
-				SDL_RenderCopy(renderer, proyectilEnemigo2Textura, &srcProyectilEnemigo2, &proyectilRect);
-        	}
-		}
-        
+	    
         // Actualización de posición del rectángulo de representación
 		jugador.x = player.x;
 		jugador.y = player.y;
@@ -605,59 +754,7 @@ int main(int argc, char *argv[]) {
 		SDL_Rect srcRect = {frameActual * ANCHO_FRAME, animacionActual * ALTO_FRAME, ANCHO_FRAME, ALTO_FRAME};
 		SDL_Rect dstRect = {jugador.x, jugador.y, jugador.w, jugador.h};
 		SDL_RenderCopyEx(renderer, jugadorTextura, &srcRect, &dstRect, 0, NULL, flip);
-		// comprobacion de colicion entre disparos y enemigos
-		for (i = 0; i < MAX_DISPAROS; i++) {
-            if (disparos[i].activo) {
-                SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
-                SDL_RenderCopy(renderer, balaTextura, NULL, &rect_disparo);
-				//comprobacion de interseccion entre enemigos tipo 1 y la bala
-				for (j=0; j<MAX_ENEMIGOS;j++){
-					if (enemigo1[j].activo) {
-						SDL_Rect enemigo1Rect = {enemigo1[j].x + 15, enemigo1[j].y + 20, 40, 40};
-						if (SDL_HasIntersection(&rect_disparo,&enemigo1Rect)){
-							enemigo1[j].vida-=1;
-							disparos[i].activo = 0;
-							if (enemigo1[j].vida <= 0){
-								enemigo1[j].activo = 0;
-                    			enemigo1[j].tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;
-                    			// Generar moneda en la posición del enemigo muerto
-								generar_moneda(monedas, enemigo1[j].x, enemigo1[j].y);	
-							}
-						}
-					}
-				}
-                
-				/*SDL_Rect enemigo1Rect = {enemigo1.x, enemigo1.y, enemigo1.ancho, enemigo1.alto};
-                if (enemigo1.activo && detectarColision(rect_disparo, enemigo1Rect)) {
-                    disparos[i].activo = 0;
-                    enemigo1.activo = 0;
-                    enemigo1.tiempoReaparicion = SDL_GetTicks() + TIEMPO_REAPARICION_ENEMIGO;
-                }*/
-				
-				//comprobacion de colivion entre enemigos tipo 2 y la bala
-				
-                
-                if (enemigo1[j].activo) {
-					SDL_Rect enemigo2Rect = {enemigo2.x+15 , enemigo2.y + 20, 40, 40};
-						if (SDL_HasIntersection(&rect_disparo,&enemigo2Rect)){
-							disparos[i].activo = 0;
-                    		enemigo2.activo = 0;
-                    		enemigo2.tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;
-							
-						}
-					}
-				/*
-                SDL_Rect enemigo2Rect = {enemigo2.x, enemigo2.y, enemigo2.ancho, enemigo2.alto};
-                if (enemigo2.activo && detectarColision(rect_disparo, enemigo2Rect)) {
-                    disparos[i].activo = 0;
-                    enemigo2.activo = 0;
-                    enemigo2.tiempoReaparicion = SDL_GetTicks() + TIEMPO_REAPARICION_ENEMIGO;
-                }
-                */
-            }
-        }
-        
-        
+		 
         // renderizado visual de enemigo1 activo, funciones utilizadas para renderizar con textura asociada, en este caso el zombie
         for (i=0; i<MAX_ENEMIGOS ;i++){
         	if (enemigo1[i].activo) {
@@ -667,14 +764,6 @@ int main(int argc, char *argv[]) {
         }
 		
 		}
-		/* antes de moneda
-		
-        if (enemigo1.activo) {
-            SDL_Rect enemigo1SrcRect = {enemigo1.frameActual * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
-            SDL_Rect enemigo1DstRect = {enemigo1.x, enemigo1.y, enemigo1.ancho, enemigo1.alto};
-            SDL_RenderCopy(renderer, enemigo1Textura, &enemigo1SrcRect, &enemigo1DstRect);
-        }
-		*/
 		
 		// renderizado para el mago y renderizados de su disparo si existe
         if (enemigo2.activo) {
@@ -690,28 +779,6 @@ int main(int argc, char *argv[]) {
     		SDL_RenderCopy(renderer, enemigo2Textura, &enemigo2SrcRect, &enemigo2DstRect);
 		}
 		
-		// aqui sigue el tratamiento de intersecciones entre entidades, ademas un agregado de HITBOX visibles por propositos de depuracion
-		// aqui iran las acciones de interseccion entre enemigos contra el jugador
-		// ejemplos aplicables, disminucion de vida
-		// se comprueban todas las posibles situaciones de interseccion, segun la existencia o no del propio enemigo (si esta activo o no)
-		
-		SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
-		
-		for (i=0;i<MAX_ENEMIGOS;i++){
-			if (enemigo1[i].activo){
-				SDL_Rect enemigo1Rect = {enemigo1[i].x + 15, enemigo1[i].y + 20, 40, 40};
-				if (SDL_HasIntersection(&jugadorHitbox,&enemigo1Rect)){
-					//ejecuto acciones de DAÑO
-					mostrarVentanaEmergente();
-				}
-			}
-		}
-		if (enemigo2.activo){
-			SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
-			if (SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
-				mostrarVentanaEmergente();			
-			}
-		}	
 		
 		//colicion/ interseccion entre jugador y moneda
         for ( i = 0; i < MAX_MONEDAS; i++) {
