@@ -14,9 +14,7 @@ void mostrarVentanaEmergente() {
 // SDL_tipoDeDatoVariable *nombreReprecentativo = FuncionReservada (parametros) 
 // algunas veces el igual no hace falta, por ejemplo los casos de eventos, ya que solo necesitamos tener/nombrar una variable para acceder a ellos ya que
 // son recolectados de manera transparente al programador.
-// * es para declarar punteros o acceder a ellos, mientras que & es para apuntar a la direccion de memoria, en si por ejemplo *p y &p son distintos, 
-// *p sera el contenido o la definicion del puntero, y &p sera la direccion de memoria del puntero, usualmente en hexadesimal
-// si realizas *p = 10, el 10 sera la direccion de memoria en hex, no un valor numerico normalmente tratable, si realizas x = *p, x tendra el contenido de la dir 10
+// * es para declarar punteros o acceder a ellos, mientras que & es para apuntar a la direccion de memoria
 typedef struct {
     int x, y;               // Posición del disparo
     int ancho, alto;        // Tamaño del disparo
@@ -66,13 +64,13 @@ typedef struct {
 
 typedef struct {
     int numero_oleada;        // oleadas faltantes
-    int oleada_maxima         // maximo de oleada
+    int oleada_maxima;         // maximo de oleada
     int enemigos_activos;     // enemigos vivos en pantalla
     Uint32 tiempo_restante;   // Tiempo restante para la oleada (en ms)
     Uint32 tiempo_transicion; // Tiempo entre oleadas (en ms)
     int en_transicion;        // 1 si está en transición, 0 si está en oleada activa
+    int momento_dia; 		  // 1 dia, 2 atardecer, 3 noche, 4 amanecer
 } Oleada;
-
 
 Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
 Uint32 cooldownAtaqueEnemigo2 = 750; // Tiempo entre ataques del enemigo 2
@@ -120,11 +118,11 @@ int i;
 int j;
 
 void iniciar_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
-	oleada_actual->numero_oleada++
-    oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
+	
+	oleada_actual->numero_oleada++;
     oleada_actual->enemigos_activos = 0;
     oleada_actual->tiempo_restante = 30000; // 30 segundos en milisegundos
-    oleada_actual->tiempo_transicion = 10000; // 5 segundos de transición/descanso entre oleadas
+    oleada_actual->tiempo_transicion = 15000; // 5 segundos de transición/descanso entre oleadas
     oleada_actual->en_transicion = 0;
     
     for (i = 0; i < MAX_ENEMIGOS; i++) {
@@ -137,10 +135,8 @@ void iniciar_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
         enemigo1[i].frameActual=0;
         enemigo1[i].tiempoFrame=200;
         enemigo1[i].tiempoAnterior=SDL_GetTicks();
-        enemigo1[i].tiempoReaparicion=enemigo1[i]->tiempoAnterior + TIEMPO_REAPARICION_ENEMIGO ; 
-        enemigo1[i].vida = 2;
-        oleada_actual->enemigos_activos ++;
-        
+        enemigo1[i].tiempoReaparicion=enemigo1[i].tiempoAnterior + TIEMPO_REAPARICION_ENEMIGO ; 
+        enemigo1[i].vida = 2;     
     }
 }
 
@@ -153,7 +149,6 @@ void actualizar_cronometro(Oleada *oleada_actual, Uint32 delta_tiempo) {
         }
     }
 }
-
 
 void generar_moneda(Moneda monedas[MAX_MONEDAS], int x, int y) {
     for ( i = 0; i < MAX_MONEDAS; i++) {
@@ -181,7 +176,7 @@ void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual, Oleada *ole
                 enemigo1[i].frameActual = (enemigo1[i].frameActual + 1) % FRAMES_ENEMIGO1;
                 enemigo1[i].tiempoAnterior = tiempo_actual;
 			}
-		}else if ((tiempo_actual > enemigo1[i].tiempoReaparicion) && (oleada->actual > 0)) {
+		}else if ((tiempo_actual > enemigo1[i].tiempoReaparicion) && (oleada_actual->tiempo_restante > 0)) {
 		//si no esta activo, pregunta por condiciones de reaparicion y lo ejecuta si cumple, si el cronometro termino, dejo de spawnear enemigos
             	enemigo1[i].activo = 1;
             	enemigo1[i].vida = 3;
@@ -206,7 +201,7 @@ void recibir_dano(Jugador *player, int *game_over) {
     }
     
  // Función para reiniciar el juego
-void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2) {
+void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2, Oleada *oleada_actual) {
         int i = 0;
 		player->x = 640;
         player->y = 300;
@@ -230,7 +225,13 @@ void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo
         enemigo1[i].tiempoReaparicion=enemigo1[i].tiempoAnterior+TIEMPO_REAPARICION_ENEMIGO; 
         enemigo1[i].vida = 2;
     	}
-    	//falta reiniciar la oleada
+    	
+    	oleada_actual->momento_dia = 1;
+    	oleada_actual->numero_oleada=0;
+    	oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
+    	iniciar_oleada(oleada_actual,enemigo1); //inicializo oleada
+    	
+    	
     	enemigo2->x = 1000;
     	enemigo2->y = 300;
     	enemigo2->ancho = 80;
@@ -243,7 +244,7 @@ void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo
     	enemigo2->tiempoReaparicion = 0;
     	
         printf("Juego reiniciado.\n");
-    }
+}
 
 // Verificar fin de oleada
 int verificar_fin_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
@@ -258,40 +259,62 @@ int verificar_fin_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
     return 0; // Tiempo restante
 }
 
+// manejo de la transicion o momento entre oleadas y/o estado del dia
 void manejar_transicion(Oleada *oleada_actual, Uint32 delta_tiempo,Enemigo1 enemigo1[]) {
-    if (oleada_actual->tiempo_transicion > delta_tiempo) {
+    if (oleada_actual->tiempo_transicion > delta_tiempo) {// si entra aca, estoy esperando 15 segundos de descanso
         oleada_actual->tiempo_transicion -= delta_tiempo;
         printf("Transición activa. Tiempo restante: %d ms\n", oleada_actual->tiempo_transicion);
     } else {
         printf("Transición terminada. Iniciando siguiente oleada.\n");
         oleada_actual->en_transicion = 0;
 
-        if (oleada_actual->numero_oleada <= oleada_actual->oleada_maxima) {
-        	oleada_actual->numero_oleada++;
-        	oleada_actual->tiempo_restante=30000 //vuelvo a poner 30 segundos
-        	oleada_actual->tiempo_transicion=15000 // vuelvo a colocar 15 segundos de descaso entre oleadas
-        	 oleada_actual->enemigos_activos = 0;
-        	 
-        	 for (i = 0; i < MAX_ENEMIGOS; i++) {
-        		enemigo1[i].x = 1200; // Posición inicial
-        		enemigo1[i].y = rand() % (750 - 300);
-        		enemigo1[i].ancho = 80;       // Ancho predeterminado
-        		enemigo1[i].alto = 80;        // Alto predeterminado
-        		enemigo1[i].activo = 0;       // Activo al inicio
-        		enemigo1[i].velocidad_x = 2; // Velocidad
-        		enemigo1[i].frameActual=0;
-        		enemigo1[i].tiempoFrame=200;
-        		enemigo1[i].tiempoAnterior=SDL_GetTicks();
-        		enemigo1[i].tiempoReaparicion=enemigo1[i]->tiempoAnterior + TIEMPO_REAPARICION_ENEMIGO ; 
-        		enemigo1[i].vida = 2;
-        		oleada_actual->enemigos_activos ++;
-        	}
+        if (oleada_actual->numero_oleada <= oleada_actual->oleada_maxima) {        	
+        	iniciar_oleada(oleada_actual,enemigo1);
         } else {// o paso dia->atardecer | atardecer->noche | noche->amanecer | amanecer->dia 
-            // aca iria el tratamiento para la siguiente transicion del dia, por ejemplo la tarde y que pasara de fondo y habilite la tienda
-            // pongo el booleano o contador del momento del dia en verdadero o falso, y veo que prosigue
+        	if (oleada_actual->momento_dia > 4){
+				oleada_actual->momento_dia=1;
+			}else {
+			oleada_actual->momento_dia ++;
+			}
+          	printf("Cambio de momento del día: %d\n", oleada_actual->momento_dia);
+        	oleada_actual->numero_oleada=0;
+    		oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
+    		iniciar_oleada(oleada_actual,enemigo1); //inicializo oleada
         }
     }
 }
+
+void renderizar_texto(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y) {
+    // color del texto
+    SDL_Color color = {255, 255, 255, 255}; // Blanco
+
+    // Renderizar una superficie
+    SDL_Surface *superficie_texto = TTF_RenderText_Solid(fuente, texto, color);
+    if (!superficie_texto) {
+        printf("Error al renderizar texto: %s\n", TTF_GetError());
+        return;
+    }
+
+    // textura
+    SDL_Texture *textura_texto = SDL_CreateTextureFromSurface(renderer, superficie_texto);
+    SDL_Rect destino = {x, y, superficie_texto->w, superficie_texto->h};
+
+    // Renderizar 
+    SDL_RenderCopy(renderer, textura_texto, NULL, &destino);
+
+    // Liberar recursos
+    SDL_FreeSurface(superficie_texto);
+    SDL_DestroyTexture(textura_texto);
+}
+
+void mostrar_oleadas(SDL_Renderer *renderer, TTF_Font *fuente, int numero_oleada, int total_oleadas) {
+    char texto[32];
+    sprintf(texto, "Oleada %d/%d", numero_oleada, total_oleadas);
+
+    // Renderizar texto en pantalla
+    renderizar_texto(renderer, fuente, texto, 1120, 5); // Ajusta la posición (50, 50)
+}
+
 
 int main(int argc, char *argv[]) {
 	srand(time(NULL));  // Inicializar el generador de números aleatorios
@@ -379,13 +402,14 @@ int main(int argc, char *argv[]) {
     //inicializacion de registro o entidad jugador
 	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant, dinero
   	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
-  	
 	 // Inicializar los disparos
     Disparo disparos[MAX_DISPAROS];
     Moneda monedas[MAX_MONEDAS];
     Enemigo1 enemigo1[MAX_ENEMIGOS];
     Oleada oleada_actual; // creo variable registro
     oleada_actual.numero_oleada=0;
+    oleada_actual.momento_dia = 1;
+    oleada_actual.oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
     iniciar_oleada(&oleada_actual,enemigo1); //inicializo oleada
     
     int i= 0;
@@ -394,7 +418,7 @@ int main(int argc, char *argv[]) {
     }
     
     for (i = 0; i < MAX_DISPAROS; i++) {
-    disparosEnemigo2[i].activo = 0;
+        disparosEnemigo2[i].activo = 0;
 	}
 	
 	for (i = 0; i < MAX_MONEDAS; i++){
@@ -536,20 +560,21 @@ int main(int argc, char *argv[]) {
                 // logica para cerrar y reiniciar la app segun ubicacion y accion de el raton
                 
                 if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_reintentar)) {
-                    reiniciar_juego(&player, disparos, &game_over, enemigo1,&enemigo2);
+                    reiniciar_juego(&player, disparos, &game_over, enemigo1,&enemigo2,&oleada_actual);
                 }
                 
 				if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_cerrar)) {
                     running = 0;
                 }
 			}
-        }//termina adm eventos
+        }
+        //termina adm eventos
         
         //logica del juego, act de enemigos y disparos
         
-         if (oleada_actual.en_transicion) {// tiempo para recoger monedas en caso de no llegar a la oleada final, si se llego hacer cambio de fondos
-            manejar_transicion(&oleada_actual, delta_tiempo); 
-        } else { // si no es una transicion o intermedio, estas en una oleada
+        if (oleada_actual.en_transicion) {// tiempo para recoger monedas en caso de no llegar a la oleada final, si se llego hacer cambio de fondos
+            manejar_transicion(&oleada_actual, delta_tiempo, enemigo1); 
+        }else { // si no es una transicion o intermedio, estas en una oleada
             actualizar_cronometro(&oleada_actual, delta_tiempo);
             actualizar_enemigo1(enemigo1,tiempo_actual,&oleada_actual);
             
@@ -661,11 +686,11 @@ int main(int argc, char *argv[]) {
 				
 	                if (enemigo2.activo) {
 						SDL_Rect enemigo2Rect = {enemigo2.x+15 , enemigo2.y + 20, 40, 40};
-							if (SDL_HasIntersection(&rect_disparo,&enemigo2Rect)){
-								disparos[i].activo = 0;
-                	    		enemigo2.activo = 0;
-                    			enemigo2.tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;								
-							}
+						if (SDL_HasIntersection(&rect_disparo,&enemigo2Rect)){
+							disparos[i].activo = 0;
+                	    	enemigo2.activo = 0;
+                    		enemigo2.tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;								
+						}
 					}
             	}
         	}
@@ -692,17 +717,12 @@ int main(int argc, char *argv[]) {
 			}	
 
 		
-            if (verificar_fin_oleada(&oleada_actual, enemigos)) { //devuelve 1 si y solo si enemigos restantes = 0 y termino los 30 segundos de oleada
+            if (verificar_fin_oleada(&oleada_actual, enemigo1)) { //devuelve 1 si y solo si enemigos restantes = 0 y termino los 30 segundos de oleada
                 oleada_actual.en_transicion = 1;
                 oleada_actual.tiempo_transicion = 15000; // 15 segundos
-                if (oleada_actual.numero_oleada <= (oleada_actual.oleada_maxima)){ // compuebo si no supero la oleada final, sino aumento +1
-                	oleada_actual.numero_oleada++;	
-				}
-            }
+			}
         }
-        
         // renderizados etc abajo
-       
         // Control de animaciones del jugador
         if (animacionActual == DISPARO && SDL_GetTicks() > tiempoInicioDisparo + duracionAnimacionDisparo) {
             animacionActual = REPOSO;
@@ -740,7 +760,21 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-	
+		/*
+		
+		ACA FALTAN VARIABLES PARA CADA UNO DE LOS FONDOS; MAS ARRIBA CERCA DE LAS INICIALIZACIONES
+		
+		// Renderizar fondo según el momento del día
+    	if (oleada_actual.momento_dia == 1) {
+	        SDL_RenderCopy(renderer, fondoDiaTextura, NULL, NULL);
+	    } else if (oleada_actual.momento_dia == 2) {
+	        SDL_RenderCopy(renderer, fondoAtardecerTextura, NULL, NULL);
+	    } else if (oleada_actual.momento_dia == 3) {
+	        SDL_RenderCopy(renderer, fondoNocheTextura, NULL, NULL);
+	    } else if (oleada_actual.momento_dia == 4) {
+	        SDL_RenderCopy(renderer, fondoAmanecerTextura, NULL, NULL);
+	    }
+		*/
 		SDL_RenderCopy(renderer, fondoTextura, NULL, NULL);
 	    
         // Actualización de posición del rectángulo de representación
@@ -758,29 +792,26 @@ int main(int argc, char *argv[]) {
         // renderizado visual de enemigo1 activo, funciones utilizadas para renderizar con textura asociada, en este caso el zombie
         for (i=0; i<MAX_ENEMIGOS ;i++){
         	if (enemigo1[i].activo) {
-            SDL_Rect enemigo1SrcRect = {enemigo1[i].frameActual * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
-            SDL_Rect enemigo1DstRect = {enemigo1[i].x, enemigo1[i].y, enemigo1[i].ancho, enemigo1[i].alto};
-            SDL_RenderCopy(renderer, enemigo1Textura, &enemigo1SrcRect, &enemigo1DstRect);
-        }
-		
+                SDL_Rect enemigo1SrcRect = {enemigo1[i].frameActual * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
+                SDL_Rect enemigo1DstRect = {enemigo1[i].x, enemigo1[i].y, enemigo1[i].ancho, enemigo1[i].alto};
+                SDL_RenderCopy(renderer, enemigo1Textura, &enemigo1SrcRect, &enemigo1DstRect);
+            }
 		}
 		
 		// renderizado para el mago y renderizados de su disparo si existe
         if (enemigo2.activo) {
     		SDL_Rect enemigo2SrcRect;
-    
     		if (atacandoEnemigo2) {
         		enemigo2SrcRect = (SDL_Rect){enemigo2.frameActual * ANCHO_FRAME, ALTO_FRAME, ANCHO_FRAME, ALTO_FRAME};
     		} else {
         		enemigo2SrcRect = (SDL_Rect){enemigo2.frameActual * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
     		}
-
     		SDL_Rect enemigo2DstRect = {enemigo2.x, enemigo2.y, enemigo2.ancho, enemigo2.alto};
     		SDL_RenderCopy(renderer, enemigo2Textura, &enemigo2SrcRect, &enemigo2DstRect);
-		}
-		
-		
+		}	
 		//colicion/ interseccion entre jugador y moneda
+		SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
+		
         for ( i = 0; i < MAX_MONEDAS; i++) {
 		    if (monedas[i].activo) {
 		        SDL_Rect moneda_rect = {monedas[i].x, monedas[i].y, monedas[i].ancho, monedas[i].alto};
@@ -790,7 +821,6 @@ int main(int argc, char *argv[]) {
 		           // puntuacion += 10;       // Aumentar puntuación (puedes cambiar el valor si deseas)
 		            printf("se recogio la moneda");  // Mostrar puntuación en consola
 		            player.dinero++;
-		            
 		        }
 		    }
 		}
@@ -842,15 +872,20 @@ int main(int argc, char *argv[]) {
         // Dibujar el texto
         SDL_RenderCopy(renderer, texturaTexto, NULL, &rectTexto);
         SDL_DestroyTexture(texturaTexto);
+    
+        mostrar_oleadas(renderer, fuente, oleada_actual.numero_oleada, oleada_actual.oleada_maxima);
   		
 		SDL_RenderPresent(renderer);
         SDL_Delay(16);
-        
-    
 	}
 		
     // Liberar recursos y cerrar SDL
-    SDL_DestroyTexture(proyectilEnemigo2Textura);
+    //SDL_DestroyTexture(proyectilEnemigo2Textura);
+    if (proyectilEnemigo2Textura != NULL) { 
+		SDL_DestroyTexture(proyectilEnemigo2Textura); 
+	} else { 
+        printf("proyectilEnemigo2Textura no fue inicializado correctamente\n");
+    }
 	SDL_DestroyTexture(fondoTextura);
     SDL_DestroyTexture(balaTextura);
     SDL_DestroyTexture(enemigo1Textura);
@@ -862,6 +897,5 @@ int main(int argc, char *argv[]) {
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();
-
     return 0;
 }
