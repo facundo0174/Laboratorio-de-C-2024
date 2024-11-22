@@ -315,6 +315,33 @@ void mostrar_oleadas(SDL_Renderer *renderer, TTF_Font *fuente, int numero_oleada
     renderizar_texto(renderer, fuente, texto, 1120, 5); // Ajusta la posición (50, 50)
 }
 
+void mostrar_cronometro(SDL_Renderer *renderer, TTF_Font *fuente, Oleada *oleada_actual) {
+    char texto[64]; 
+    Uint32 tiempo_mostrar;
+    SDL_Color color = {255, 255, 255, 255}; // Blanco
+
+    // mostrar el  cronometro adecuado
+    if (oleada_actual->en_transicion) {
+        tiempo_mostrar = oleada_actual->tiempo_transicion;
+        snprintf(texto, sizeof(texto), "Descanzo: %d seg", tiempo_mostrar / 1000);
+    } else {
+        tiempo_mostrar = oleada_actual->tiempo_restante;
+        snprintf(texto, sizeof(texto), "Oleada: %d seg", tiempo_mostrar / 1000);
+    }
+
+    // renderizar texto
+    SDL_Surface *superficie_texto = TTF_RenderText_Solid(fuente, texto, color);
+    SDL_Texture *textura_texto = SDL_CreateTextureFromSurface(renderer, superficie_texto);
+
+    SDL_Rect destino = {640, 5, superficie_texto->w, superficie_texto->h};
+    SDL_RenderCopy(renderer, textura_texto, NULL, &destino);
+
+    // Liberar recursos
+    SDL_FreeSurface(superficie_texto);
+    SDL_DestroyTexture(textura_texto);
+}
+
+
 
 int main(int argc, char *argv[]) {
 	srand(time(NULL));  // Inicializar el generador de números aleatorios
@@ -874,6 +901,8 @@ int main(int argc, char *argv[]) {
         SDL_DestroyTexture(texturaTexto);
     
         mostrar_oleadas(renderer, fuente, oleada_actual.numero_oleada, oleada_actual.oleada_maxima);
+  		
+  		mostrar_cronometro(renderer, fuente, &oleada_actual);
   		
 		SDL_RenderPresent(renderer);
         SDL_Delay(16);
