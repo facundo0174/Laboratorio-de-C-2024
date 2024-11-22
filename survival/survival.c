@@ -7,7 +7,7 @@
 #include <SDL_ttf.h>
 
 void mostrarVentanaEmergente() {
-    printf("hitbox detectado, has sido dañado");
+    printf("");
 }
 
 // la mayoria de datos SDL, se reprecentan de la siguiente manera:
@@ -71,6 +71,13 @@ typedef struct {
     int en_transicion;        // 1 si está en transición, 0 si está en oleada activa
     int momento_dia; 		  // 1 dia, 2 atardecer, 3 noche, 4 amanecer
 } Oleada;
+
+typedef struct {
+	int x, y;             // Posición
+    int ancho, alto;      // Tamaño
+    int construida;       // 0 = destruida, 1 = construida
+    int vida;             // cantidad de hits soportada de la barrera
+}Defensa;
 
 Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
 Uint32 cooldownAtaqueEnemigo2 = 750; // Tiempo entre ataques del enemigo 2
@@ -261,25 +268,33 @@ int verificar_fin_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
 
 // manejo de la transicion o momento entre oleadas y/o estado del dia
 void manejar_transicion(Oleada *oleada_actual, Uint32 delta_tiempo,Enemigo1 enemigo1[]) {
-    if (oleada_actual->tiempo_transicion > delta_tiempo) {// si entra aca, estoy esperando 15 segundos de descanso
+    
+	if (oleada_actual->tiempo_transicion > delta_tiempo) {// si entra aca, estoy esperando 15 segundos de descanso
         oleada_actual->tiempo_transicion -= delta_tiempo;
         printf("Transición activa. Tiempo restante: %d ms\n", oleada_actual->tiempo_transicion);
     } else {
         printf("Transición terminada. Iniciando siguiente oleada.\n");
         oleada_actual->en_transicion = 0;
 
-        if (oleada_actual->numero_oleada <= oleada_actual->oleada_maxima) {        	
+        if (oleada_actual->numero_oleada < oleada_actual->oleada_maxima) {        	
         	iniciar_oleada(oleada_actual,enemigo1);
         } else {// o paso dia->atardecer | atardecer->noche | noche->amanecer | amanecer->dia 
-        	if (oleada_actual->momento_dia > 4){
+        	if (oleada_actual->momento_dia == 4){ // si termine el tiempo de espera del amanecer pasare al momento del dia
 				oleada_actual->momento_dia=1;
 			}else {
 			oleada_actual->momento_dia ++;
 			}
           	printf("Cambio de momento del día: %d\n", oleada_actual->momento_dia);
-        	oleada_actual->numero_oleada=0;
-    		oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
-    		iniciar_oleada(oleada_actual,enemigo1); //inicializo oleada
+          	if (oleada_actual->momento_dia == 2 || oleada_actual->momento_dia == 4){
+          		oleada_actual->tiempo_transicion=15000;
+          		oleada_actual->en_transicion=1;
+			  }else{
+			  	oleada_actual->numero_oleada=0;
+    			oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
+    			iniciar_oleada(oleada_actual,enemigo1); //inicializo oleada
+    			oleada_actual->en_transicion=0;
+			  }
+        	
         }
     }
 }
@@ -339,6 +354,33 @@ void mostrar_cronometro(SDL_Renderer *renderer, TTF_Font *fuente, Oleada *oleada
     // Liberar recursos
     SDL_FreeSurface(superficie_texto);
     SDL_DestroyTexture(textura_texto);
+}
+
+void inicializar_defensa(Defensa *barricada) {
+    barricada->x = 100;           // Posición inicial
+    barricada->y = 225;           // Fila donde estará la defensa
+    barricada->ancho = 40;       // Ancho de la defensa
+    barricada->alto = 370;         // Alto de la defensa
+    barricada->construida = 0;    // Inicia como destruida
+    barricada->vida = 0;
+}
+
+void renderizar_defensa(SDL_Renderer *renderer, Defensa *barricada, SDL_Texture *textura_construida, SDL_Texture *textura_destruida) {
+    SDL_Texture *textura_actual = barricada->construida 
+                                  ? textura_construida 
+                                  : textura_destruida;
+    SDL_Rect rect = {barricada->x, barricada->y, barricada->ancho, barricada->alto};
+    SDL_RenderCopy(renderer, textura_actual, NULL, &rect);
+
+}
+
+void reconstruir_defensa(Defensa *barricada) {
+
+    if (barricada->construida<1){
+    	barricada->construida = 1; // la construyo
+	}else{
+		barricada->construida = 0; // la destruyo
+	}
 }
 
 
@@ -410,13 +452,56 @@ int main(int argc, char *argv[]) {
 
 	// Cargar texturas de los personajes, enemigos y proyectiles
     SDL_Texture *jugadorTextura = IMG_LoadTexture(renderer, "sprites/personaje2.png");
+    if (!jugadorTextura) {
+        printf("No se pudo cargar la textura de jugador: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
     SDL_Texture *enemigo1Textura = IMG_LoadTexture(renderer, "sprites/enemigo1.png");
+    if (!enemigo1Textura) {
+        printf("No se pudo cargar la textura de enemigo1: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    
     SDL_Texture *enemigo2Textura = IMG_LoadTexture(renderer, "sprites/enemigo2.png");
-    SDL_Texture *proyectilEnemigo2Textura = IMG_LoadTexture(renderer, "imagenes/proyectilEnemigo2.png");
+    if (!enemigo2Textura) {
+        printf("No se pudo cargar la textura de enemigo2: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+   
+    SDL_Texture *proyectilEnemigo2Textura = IMG_LoadTexture(renderer, "sprites/proyectilEnemigo2.png");
+    if (!proyectilEnemigo2Textura) {
+        printf("No se pudo cargar la textura de proyectil enemigo: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    
     SDL_Texture *balaTextura = IMG_LoadTexture(renderer, "sprites/bala.png");
-    //img de fondo
+    if (!balaTextura) {
+        printf("No se pudo cargar la textura de proyectil jugador: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    
+	//img de fondo
     SDL_Texture *fondoTextura = IMG_LoadTexture(renderer, "sprites/fondo.png");
-    //exepcion para el fondo
     if (!fondoTextura) {
         printf("No se pudo cargar la textura de fondo: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
@@ -426,7 +511,27 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    //inicializacion de registro o entidad jugador
+    SDL_Texture *textura_defensa_construida = IMG_LoadTexture(renderer, "sprites/barricada2.png");
+    if (!textura_defensa_construida) {
+        printf("No se pudo cargar la textura de barricada construida: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    
+	SDL_Texture *textura_defensa_destruida = IMG_LoadTexture(renderer, "sprites/destruido.png");
+    if (!textura_defensa_destruida) {
+        printf("No se pudo cargar la textura de barricada destruida: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    
+    //inicializacion de registro o entidad jugador y demas entidades necesarias para la logica
 	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant, dinero
   	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
 	 // Inicializar los disparos
@@ -438,6 +543,8 @@ int main(int argc, char *argv[]) {
     oleada_actual.momento_dia = 1;
     oleada_actual.oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
     iniciar_oleada(&oleada_actual,enemigo1); //inicializo oleada
+    Defensa barricada;
+    inicializar_defensa(&barricada);
     
     int i= 0;
     for ( i = 0; i < MAX_DISPAROS; i++) {
@@ -571,6 +678,10 @@ int main(int argc, char *argv[]) {
 					
 					case SDLK_l: //realizarce daño para proposito de depuracion
 						recibir_dano(&player,&game_over);
+						break;
+					
+					case SDLK_m://depuracion de la defensa/barricada
+						reconstruir_defensa(&barricada);
 						break;
                  
                 }
@@ -745,8 +856,9 @@ int main(int argc, char *argv[]) {
 
 		
             if (verificar_fin_oleada(&oleada_actual, enemigo1)) { //devuelve 1 si y solo si enemigos restantes = 0 y termino los 30 segundos de oleada
+            // estoy en el fin de la oleada final, para evitar el doble tiempo de espera entre oleada y cambio de momento del dia se coloca en 0
                 oleada_actual.en_transicion = 1;
-                oleada_actual.tiempo_transicion = 15000; // 15 segundos
+                oleada_actual.tiempo_transicion = 0; // 15 segundos
 			}
         }
         // renderizados etc abajo
@@ -904,6 +1016,9 @@ int main(int argc, char *argv[]) {
   		
   		mostrar_cronometro(renderer, fuente, &oleada_actual);
   		
+  		renderizar_defensa(renderer, &barricada, textura_defensa_construida, textura_defensa_destruida);
+
+  		
 		SDL_RenderPresent(renderer);
         SDL_Delay(16);
 	}
@@ -920,6 +1035,8 @@ int main(int argc, char *argv[]) {
     SDL_DestroyTexture(enemigo1Textura);
     SDL_DestroyTexture(enemigo2Textura);
     SDL_DestroyTexture(jugadorTextura);
+    SDL_DestroyTexture(textura_defensa_construida);
+	SDL_DestroyTexture(textura_defensa_destruida);
     TTF_CloseFont(fuente);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(ventana);
