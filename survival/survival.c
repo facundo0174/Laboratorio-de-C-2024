@@ -60,6 +60,9 @@ typedef struct {
     int x, y;               // Posición de la moneda
     int ancho, alto;        // Tamaño de la moneda
     int activo;             // Si la moneda está en pantalla
+    int frame_actual;       // Frame actual de la animación
+    Uint32 tiempo_anterior; // Tiempo del último cambio de frame
+    Uint32 intervalo_frame; // Tiempo entre frames
 } Moneda;
 
 typedef struct {
@@ -177,13 +180,16 @@ void actualizar_cronometro(Oleada *oleada_actual, Uint32 delta_tiempo) {
 }
 
 void generar_moneda(Moneda monedas[MAX_MONEDAS], int x, int y) {
-    for ( i = 0; i < MAX_MONEDAS; i++) {
+    for (i = 0; i < MAX_MONEDAS; i++) {
         if (!monedas[i].activo) {
             monedas[i].activo = 1;
             monedas[i].x = x;
             monedas[i].y = y;
-            monedas[i].ancho = 10;
-            monedas[i].alto = 10;
+            monedas[i].ancho = 32;  // Ancho de cada frame en el spritesheet
+            monedas[i].alto = 32;   // Alto de cada frame en el spritesheet
+            monedas[i].frame_actual = 0;
+            monedas[i].tiempo_anterior = SDL_GetTicks();
+            monedas[i].intervalo_frame = 100; // Cambiar frame cada 100ms
             break;
         }
     }
@@ -693,6 +699,16 @@ int main(int argc, char *argv[]) {
         SDL_Quit();
         return 1;
     }
+    
+    SDL_Texture *moneda_spritesheet = IMG_LoadTexture(renderer, "sprites/moneda.png");
+    if (!moneda_spritesheet) {
+        printf("No se pudo cargar el spritesheet de la moneda: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
 	
 	//inicializacion de registro o entidad jugador y demas entidades necesarias para la logica
 	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant, dinero
@@ -1066,12 +1082,23 @@ int main(int argc, char *argv[]) {
         }
         
 		// renderizados abajo
+		
+		// Actualizar animación de monedas
+        for (i = 0; i < MAX_MONEDAS; i++) {
+            if (monedas[i].activo) {
+                if (tiempo_actual - monedas[i].tiempo_anterior >= monedas[i].intervalo_frame) {
+                    monedas[i].frame_actual = (monedas[i].frame_actual + 1) % 10; // Cambiar al siguiente frame
+                    monedas[i].tiempo_anterior = tiempo_actual;
+                }
+            }
+		}
+		
         // Control de animaciones del jugador
         if (animacionActual == DISPARO && SDL_GetTicks() > tiempoInicioDisparo + duracionAnimacionDisparo) {
             animacionActual = REPOSO;
         }
 
-        // Actualizar frame de animación
+        // Actualizar frame de animaciónes
         Uint32 tiempoActual = SDL_GetTicks();
 
         if (animacionActual == CAMINAR) {
@@ -1115,8 +1142,6 @@ int main(int argc, char *argv[]) {
 	    } else if (oleada_actual.momento_dia == 4) {
 	        SDL_RenderCopy(renderer, fondoAtardecerTextura, NULL, NULL);
 	    }
-
-		//SDL_RenderCopy(renderer, fondoTextura, NULL, NULL);
 	    
         // Actualización de posición del rectángulo de representación
 		jugador.x = player.x;
@@ -1125,7 +1150,6 @@ int main(int argc, char *argv[]) {
 		jugador.h = player.alto;
         
 		// Renderizado del jugador
-		
 		SDL_Rect srcRect = {frameActual * ANCHO_FRAME, animacionActual * ALTO_FRAME, ANCHO_FRAME, ALTO_FRAME};
 		SDL_Rect dstRect = {jugador.x, jugador.y, jugador.w, jugador.h};
 		SDL_RenderCopyEx(renderer, jugadorTextura, &srcRect, &dstRect, 0, NULL, flip);
@@ -1167,14 +1191,14 @@ int main(int argc, char *argv[]) {
 		    }
 		}
   		
-  		// Renderizar monedas
-		SDL_SetRenderDrawColor(renderer, 255, 215, 0, 255); // Color dorado para las monedas
-		for ( i = 0; i < MAX_MONEDAS; i++) {
-		    if (monedas[i].activo) {
-		        SDL_Rect rect = {monedas[i].x, monedas[i].y, monedas[i].ancho, monedas[i].alto};
-		        SDL_RenderFillRect(renderer, &rect);
-		    }
-		}
+  		// Renderizar monedas con animación
+        for (i = 0; i < MAX_MONEDAS; i++) {
+            if (monedas[i].activo) {
+                SDL_Rect src_rect = {monedas[i].frame_actual * monedas[i].ancho, 0, monedas[i].ancho, monedas[i].alto};
+                SDL_Rect dest_rect = {monedas[i].x, monedas[i].y, monedas[i].ancho, monedas[i].alto};
+                SDL_RenderCopy(renderer, moneda_spritesheet, &src_rect, &dest_rect);
+            }
+        }
 		
 		// renderizado de Indicador de vida
         renderizar_vida_jugador(renderer, &player);
