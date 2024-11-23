@@ -79,6 +79,21 @@ typedef struct {
     int vida;             // cantidad de hits soportada de la barrera
 }Defensa;
 
+// Estructura para representar una celda
+typedef struct {
+    SDL_Rect rect;      // Dimensiones de la celda
+    SDL_Texture *image; // Imagen de la celda
+} Celda;
+
+// Enumeración para controlar el tipo de animación
+typedef enum {
+    REPOSO,
+    CAMINAR,
+    DISPARO,
+    ENEMIGO1_ANIMACION,
+    ENEMIGO2_ANIMACION
+} Animacion;
+
 Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
 Uint32 cooldownAtaqueEnemigo2 = 750; // Tiempo entre ataques del enemigo 2
 int atacandoEnemigo2 = 0;            // Estado de ataque del enemigo 2
@@ -101,17 +116,11 @@ Uint32 tiempo_actual;
 #define MAX_MONEDAS 5
 #define MAX_ENEMIGOS 10
 #define VIDA_DEFAULT 6
+#define CELL_WIDTH 190 // Ancho reducido para separación
+#define CELL_HEIGHT 140 // Alto reducido para separación
+#define CELL_SPACING 10 // Separación entre celdas
 
 Disparo disparosEnemigo2[MAX_DISPAROS];
-// Enumeración para controlar el tipo de animación
-typedef enum {
-    REPOSO,
-    CAMINAR,
-    DISPARO,
-    ENEMIGO1_ANIMACION,
-    ENEMIGO2_ANIMACION
-} Animacion;
-
 // Tiempos para la duración de cada tipo de animación
 int tiempoFrameReposo = 150;
 int tiempoFrameCaminar = 400;
@@ -268,10 +277,48 @@ int verificar_fin_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
 }
 
 // manejo de la transicion o momento entre oleadas y/o estado del dia
+
 void manejar_transicion(Oleada *oleada_actual, Uint32 delta_tiempo,Enemigo1 enemigo1[]) {
-    
+    if (oleada_actual->tiempo_transicion > delta_tiempo){
+    	// si entra aca, estoy esperando 15 segundos de descanso
+    	oleada_actual->tiempo_transicion -= delta_tiempo;
+    	// Si se terminó la última oleada de la ronda y el momento del día es impar, ignora el tiempo de espera
+    	if (oleada_actual->numero_oleada == oleada_actual->oleada_maxima && (oleada_actual->momento_dia % 2 != 0)) { 
+	        oleada_actual->tiempo_transicion = 0;
+    	}
+	    printf("Transición activa. Tiempo restante: %d ms\n", oleada_actual->tiempo_transicion);
+	}else{
+    	printf("Transición terminada. Iniciando siguiente oleada.\n");
+    	oleada_actual->en_transicion = 0;
+	    if (oleada_actual->numero_oleada < oleada_actual->oleada_maxima) {   
+    	    iniciar_oleada(oleada_actual, enemigo1);
+	    }else{
+	        // Cambiar momento del día
+	        if (oleada_actual->momento_dia == 4) { // si termine el tiempo de espera del amanecer pasare al momento del día
+	            oleada_actual->momento_dia = 1;
+	        }else{
+	            oleada_actual->momento_dia++;
+	        }
+	        printf("Cambio de momento del día: %d\n", oleada_actual->momento_dia);
+	        if (oleada_actual->momento_dia % 2 == 0) { // si es tarde (2) o amanecer (4), inicia un tiempo de transición
+	            oleada_actual->tiempo_transicion = 15000;
+	            oleada_actual->en_transicion = 1;
+	        }else{ // si es día (1) o noche (3), inicia una nueva oleada/horda
+	            oleada_actual->numero_oleada = 0;
+	            oleada_actual->oleada_maxima = (rand() % 5) + 1; // posibles oleadas entre 1 y 5
+	            iniciar_oleada(oleada_actual, enemigo1); // inicializo oleada
+	            oleada_actual->en_transicion = 0;
+    	    }
+    	}
+}
+
+    /*
 	if (oleada_actual->tiempo_transicion > delta_tiempo) {// si entra aca, estoy esperando 15 segundos de descanso
         oleada_actual->tiempo_transicion -= delta_tiempo;
+    	if(oleada_actual->numero_oleada == oleada_actual->oleada_maxima && (oleada_actual->momento_dia % 2 != 0) ){ 
+			// si termino la oleada final de esa ronda, ignorare los primeros 15 segundos si y solo si se termino las oleadas de el dia o la noche
+    		oleada_actual->tiempo_transicion = 0;
+		}
         printf("Transición activa. Tiempo restante: %d ms\n", oleada_actual->tiempo_transicion);
     } else {
         printf("Transición terminada. Iniciando siguiente oleada.\n");
@@ -286,10 +333,10 @@ void manejar_transicion(Oleada *oleada_actual, Uint32 delta_tiempo,Enemigo1 enem
 			oleada_actual->momento_dia ++;
 			}
           	printf("Cambio de momento del día: %d\n", oleada_actual->momento_dia);
-          	if (oleada_actual->momento_dia == 2 || oleada_actual->momento_dia == 4){
+          	if (!oleada_actual->momento_dia%2){// solo entrara aqui si es 2 o 4, lo cual esta bien, (tarde, amanecer)
           		oleada_actual->tiempo_transicion=15000;
           		oleada_actual->en_transicion=1;
-			  }else{
+			  }else{ // si es 1 o 3, dia y noche habra nueva oleada/horda
 			  	oleada_actual->numero_oleada=0;
     			oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
     			iniciar_oleada(oleada_actual,enemigo1); //inicializo oleada
@@ -298,6 +345,7 @@ void manejar_transicion(Oleada *oleada_actual, Uint32 delta_tiempo,Enemigo1 enem
         	
         }
     }
+    */
 }
 
 void renderizar_texto(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y) {
@@ -418,6 +466,17 @@ void verificar_colision_barrera(Defensa *barricada, Enemigo1 enemigo1[]) {
     }
 }
 
+// Función para cargar una textura desde un archivo
+SDL_Texture *cargarTextura(SDL_Renderer *renderer, const char *ruta) {
+    SDL_Surface *superficie = IMG_Load(ruta);
+    if (!superficie) {
+        printf("Error al cargar imagen: %s\n", IMG_GetError());
+        return NULL;
+    }
+    SDL_Texture *textura = SDL_CreateTextureFromSurface(renderer, superficie);
+    SDL_FreeSurface(superficie);
+    return textura;
+}
 
 int main(int argc, char *argv[]) {
 	srand(time(NULL));  // Inicializar el generador de números aleatorios
@@ -494,6 +553,7 @@ int main(int argc, char *argv[]) {
         SDL_Quit();
         return 1;
     }
+    
     SDL_Texture *enemigo1Textura = IMG_LoadTexture(renderer, "sprites/enemigo1.png");
     if (!enemigo1Textura) {
         printf("No se pudo cargar la textura de enemigo1: %s\n", IMG_GetError());
@@ -570,17 +630,40 @@ int main(int argc, char *argv[]) {
   	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
 	 // Inicializar los disparos
     Disparo disparos[MAX_DISPAROS];
+    //inicializar monedas
     Moneda monedas[MAX_MONEDAS];
+    //inicializar enemigos
     Enemigo1 enemigo1[MAX_ENEMIGOS];
     Oleada oleada_actual; // creo variable registro
+    //inicializar oleada
     oleada_actual.numero_oleada=0;
     oleada_actual.momento_dia = 1;
     oleada_actual.oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
     iniciar_oleada(&oleada_actual,enemigo1); //inicializo oleada
+    //inicializar barricadas
     Defensa barricada;
     inicializar_defensa(&barricada);
+    // Crear la matriz 1x3
+    Celda matriz[1][3];
+    const char *imagenes[3] = {
+        "sprites/imagen1.png",
+        "sprites/imagen2.png",
+        "sprites/imagen3.png"
+    };
     
-    int i= 0;
+    // Inicializar la matriz
+    for (j = 0; j < 3; j++) {
+        matriz[0][j].rect.x = j * (CELL_WIDTH + CELL_SPACING) + 340; // Espaciado horizontal
+        matriz[0][j].rect.y = (600 - CELL_HEIGHT) / 2; // Centrado verticalmente
+        matriz[0][j].rect.w = CELL_WIDTH;
+        matriz[0][j].rect.h = CELL_HEIGHT;
+        matriz[0][j].image = cargarTextura(renderer, imagenes[j]);
+        if (!matriz[0][j].image) {
+            printf("Error al cargar la textura [%d]\n", j);
+        }
+    }
+    
+    //int i= 0;
     for ( i = 0; i < MAX_DISPAROS; i++) {
         disparos[i].activo = 0;
     }
@@ -592,15 +675,6 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < MAX_MONEDAS; i++){
 		monedas[i].activo = 0;
 	} 
-	
-    /* //lo siguiente es controlado al momento de la creacion de la entidad en el caso de la velocidad, el intervalo quedara en veremos
-
-    // Variables para aparición continua de enemigos
-    Uint32 tiempo_crear_enemigo = SDL_GetTicks();
-    Uint32 intervalo_creacion = 2000; // Aparecen cada 2 segundos
-    int velocidad_enemigo = 2;
-
-    */
     
      // Variables para el cooldown de disparo
     Uint32 ultimo_disparo = 0;
@@ -625,7 +699,9 @@ int main(int argc, char *argv[]) {
     // se debe configurar ambos de lo contrario la accion se volvera perpetua
 	int velocidad = 5; //velocidad traducida en 5 pixeles por bucle segun x accion de desplazamiento en cada eje
 	Disparo disparo = {0, 0, 6, 2, 0, 0, 0}; // inicializamos la entidad disparo desactivada, los parametros son correspondientes y posicionales al struct
-   
+    int mostrarMatriz = 0; // variable utilizada para logica de la tienda
+    
+    
     while (running) {
         // Procesar eventos
         // SDL_PollEvent es algo asi como un CACHE de eventos captados por la "ventana" renderizada por SDL
@@ -717,9 +793,18 @@ int main(int argc, char *argv[]) {
 					case SDLK_m://depuracion de la defensa/barricada
 						reconstruir_defensa(&barricada);
 						break;
+						
+					case SDLK_t://depuracion de la tienda
+							// Alternar visibilidad de la matriz
+							if (oleada_actual.momento_dia%2 == 0){// si es par es decir 2 o 4, cuales son momentos de transicion podremos acceder a la tienda
+								mostrarMatriz = !mostrarMatriz;
+							}else{
+								printf("no puedes acceder en este momento del dia a la tienda \n");
+							}
+						break;
                  
                 }
-            }else if (evento.type == SDL_MOUSEBUTTONDOWN && game_over){
+            }else if (evento.type == SDL_MOUSEBUTTONDOWN && game_over){// eventos de game over, reiniciar y salir del juego
             	int mouse_x, mouse_y;
                 SDL_GetMouseState(&mouse_x, &mouse_y);
 
@@ -738,7 +823,16 @@ int main(int argc, char *argv[]) {
 				if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_cerrar)) {
                     running = 0;
                 }
-			}
+			}else if (evento.type == SDL_MOUSEBUTTONDOWN && mostrarMatriz){ // eventos de tienda
+				int x = evento.button.x;
+                int y = evento.button.y;
+                // Comprobar si se seleccionó una celda
+                for (j = 0; j < 3; j++) {
+                    if (SDL_PointInRect(&(SDL_Point){x, y}, &matriz[0][j].rect)) {
+                        printf("Seleccionaste la celda [0][%d]\n", j);
+                    }
+				}
+        	}
         }
         //termina adm eventos
         
@@ -896,10 +990,11 @@ int main(int argc, char *argv[]) {
             if (verificar_fin_oleada(&oleada_actual, enemigo1)) { //devuelve 1 si y solo si enemigos restantes = 0 y termino los 30 segundos de oleada
             // estoy en el fin de la oleada final, para evitar el doble tiempo de espera entre oleada y cambio de momento del dia se coloca en 0
                 oleada_actual.en_transicion = 1;
-                oleada_actual.tiempo_transicion = 0; // 15 segundos
+                oleada_actual.tiempo_transicion = 15000; // 15 segundos
 			}
         }
-        // renderizados etc abajo
+        
+		// renderizados abajo
         // Control de animaciones del jugador
         if (animacionActual == DISPARO && SDL_GetTicks() > tiempoInicioDisparo + duracionAnimacionDisparo) {
             animacionActual = REPOSO;
@@ -1029,6 +1124,20 @@ int main(int argc, char *argv[]) {
             SDL_RenderDrawRect(renderer, &boton_reintentar);
             SDL_RenderDrawRect(renderer, &boton_cerrar);
         }
+        
+        if (mostrarMatriz) {
+            // Dibujar matriz
+            for (j = 0; j < 3; j++) {
+                // Dibujar fondo negro de la celda
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Negro
+                SDL_RenderFillRect(renderer, &matriz[0][j].rect);
+
+                // Dibujar la imagen encima del fondo negro
+                if (matriz[0][j].image) {
+                    SDL_RenderCopy(renderer, matriz[0][j].image, NULL, &matriz[0][j].rect);
+                }
+            }
+        }
   		
   		// mostar dinero con sdl_ttf
   		// se define y convierte a caracter o string lo que se quiera mostrar OBLIGADAMENTE
@@ -1062,12 +1171,11 @@ int main(int argc, char *argv[]) {
 	}
 		
     // Liberar recursos y cerrar SDL
-    //SDL_DestroyTexture(proyectilEnemigo2Textura);
-    if (proyectilEnemigo2Textura != NULL) { 
-		SDL_DestroyTexture(proyectilEnemigo2Textura); 
-	} else { 
-        printf("proyectilEnemigo2Textura no fue inicializado correctamente\n");
+     
+	 for (j = 0; j < 3; j++) {
+        SDL_DestroyTexture(matriz[0][j].image);
     }
+	SDL_DestroyTexture(proyectilEnemigo2Textura); 
 	SDL_DestroyTexture(fondoTextura);
     SDL_DestroyTexture(balaTextura);
     SDL_DestroyTexture(enemigo1Textura);
