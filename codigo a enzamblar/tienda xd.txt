@@ -1,0 +1,138 @@
+#include <SDL.h>
+#include <SDL_image.h>
+#include <stdio.h>
+
+#define WIDTH 800
+#define HEIGHT 600
+#define CELL_WIDTH 190 // Ancho reducido para separación
+#define CELL_HEIGHT 140 // Alto reducido para separación
+#define CELL_SPACING 10 // Separación entre celdas
+
+// Estructura para representar una celda
+typedef struct {
+    SDL_Rect rect;      // Dimensiones de la celda
+    SDL_Texture *image; // Imagen de la celda
+} Celda;
+
+// Función para cargar una textura desde un archivo
+SDL_Texture *cargarTextura(SDL_Renderer *renderer, const char *ruta) {
+    SDL_Surface *superficie = IMG_Load(ruta);
+    if (!superficie) {
+        printf("Error al cargar imagen: %s\n", IMG_GetError());
+        return NULL;
+    }
+    SDL_Texture *textura = SDL_CreateTextureFromSurface(renderer, superficie);
+    SDL_FreeSurface(superficie);
+    return textura;
+}
+
+int main(int argc, char *argv[]) {
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        printf("Error al inicializar SDL: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    if (IMG_Init(IMG_INIT_PNG) == 0) {
+        printf("Error al inicializar SDL_image: %s\n", IMG_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Window *ventana = SDL_CreateWindow(
+        "Ventana Azul", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
+    if (!ventana) {
+        printf("Error al crear la ventana: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        printf("Error al crear el renderer: %s\n", SDL_GetError());
+        SDL_DestroyWindow(ventana);
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Azul para el fondo de la ventana
+
+    // Variables de estado
+    int ejecutando = 1, mostrarMatriz = 0;
+    SDL_Event evento;
+
+    // Crear la matriz 1x3
+    Celda matriz[1][3];
+    const char *imagenes[3] = {
+        "imagenes/imagen1.png",
+        "imagenes/imagen2.png",
+        "imagenes/imagen3.png"
+    };
+
+    int j;
+    // Inicializar la matriz
+    for (j = 0; j < 3; j++) {
+        matriz[0][j].rect.x = j * (CELL_WIDTH + CELL_SPACING) + 100; // Espaciado horizontal
+        matriz[0][j].rect.y = (HEIGHT - CELL_HEIGHT) / 2; // Centrado verticalmente
+        matriz[0][j].rect.w = CELL_WIDTH;
+        matriz[0][j].rect.h = CELL_HEIGHT;
+        matriz[0][j].image = cargarTextura(renderer, imagenes[j]);
+        if (!matriz[0][j].image) {
+            printf("Error al cargar la textura [%d]\n", j);
+        }
+    }
+
+    // Ciclo principal
+    while (ejecutando) {
+        while (SDL_PollEvent(&evento)) {
+            if (evento.type == SDL_QUIT) {
+                ejecutando = 0;
+            } else if (evento.type == SDL_KEYDOWN && evento.key.keysym.sym == SDLK_x) {
+                // Alternar visibilidad de la matriz
+                mostrarMatriz = !mostrarMatriz;
+            } else if (evento.type == SDL_MOUSEBUTTONDOWN && mostrarMatriz) {
+                int x = evento.button.x;
+                int y = evento.button.y;
+                // Comprobar si se seleccionó una celda
+                for (j = 0; j < 3; j++) {
+                    if (SDL_PointInRect(&(SDL_Point){x, y}, &matriz[0][j].rect)) {
+                        printf("Seleccionaste la celda [0][%d]\n", j);
+                    }
+                }
+            }
+        }
+
+        // Renderizar fondo azul solo si la tienda no está abierta
+        if (!mostrarMatriz) {
+            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Azul
+            SDL_RenderClear(renderer);
+        }
+
+        if (mostrarMatriz) {
+            // Dibujar matriz
+            for (j = 0; j < 3; j++) {
+                // Dibujar fondo negro de la celda
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Negro
+                SDL_RenderFillRect(renderer, &matriz[0][j].rect);
+
+                // Dibujar la imagen encima del fondo negro
+                if (matriz[0][j].image) {
+                    SDL_RenderCopy(renderer, matriz[0][j].image, NULL, &matriz[0][j].rect);
+                }
+            }
+        }
+
+        SDL_RenderPresent(renderer);
+    }
+
+    // Liberar recursos
+    for (j = 0; j < 3; j++) {
+        SDL_DestroyTexture(matriz[0][j].image);
+    }
+
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(ventana);
+    IMG_Quit();
+    SDL_Quit();
+
+    return 0;
+}
