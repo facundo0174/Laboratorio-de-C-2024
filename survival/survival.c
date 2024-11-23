@@ -114,8 +114,8 @@ Uint32 tiempo_actual;
 #define TIEMPO_REAPARICION_ENEMIGO 3000 // Tiempo de reaparición del enemigo en ms
 #define MAX_DISPAROS 10
 #define MAX_MONEDAS 5
-#define MAX_ENEMIGOS 10
-#define VIDA_DEFAULT 6
+#define MAX_ENEMIGOS 5
+#define VIDA_DEFAULT 10
 #define CELL_WIDTH 190 // Ancho reducido para separación
 #define CELL_HEIGHT 140 // Alto reducido para separación
 #define CELL_SPACING 10 // Separación entre celdas
@@ -310,42 +310,7 @@ void manejar_transicion(Oleada *oleada_actual, Uint32 delta_tiempo,Enemigo1 enem
 	            oleada_actual->en_transicion = 0;
     	    }
     	}
-}
-
-    /*
-	if (oleada_actual->tiempo_transicion > delta_tiempo) {// si entra aca, estoy esperando 15 segundos de descanso
-        oleada_actual->tiempo_transicion -= delta_tiempo;
-    	if(oleada_actual->numero_oleada == oleada_actual->oleada_maxima && (oleada_actual->momento_dia % 2 != 0) ){ 
-			// si termino la oleada final de esa ronda, ignorare los primeros 15 segundos si y solo si se termino las oleadas de el dia o la noche
-    		oleada_actual->tiempo_transicion = 0;
-		}
-        printf("Transición activa. Tiempo restante: %d ms\n", oleada_actual->tiempo_transicion);
-    } else {
-        printf("Transición terminada. Iniciando siguiente oleada.\n");
-        oleada_actual->en_transicion = 0;
-
-        if (oleada_actual->numero_oleada < oleada_actual->oleada_maxima) {        	
-        	iniciar_oleada(oleada_actual,enemigo1);
-        } else {// o paso dia->atardecer | atardecer->noche | noche->amanecer | amanecer->dia 
-        	if (oleada_actual->momento_dia == 4){ // si termine el tiempo de espera del amanecer pasare al momento del dia
-				oleada_actual->momento_dia=1;
-			}else {
-			oleada_actual->momento_dia ++;
-			}
-          	printf("Cambio de momento del día: %d\n", oleada_actual->momento_dia);
-          	if (!oleada_actual->momento_dia%2){// solo entrara aqui si es 2 o 4, lo cual esta bien, (tarde, amanecer)
-          		oleada_actual->tiempo_transicion=15000;
-          		oleada_actual->en_transicion=1;
-			  }else{ // si es 1 o 3, dia y noche habra nueva oleada/horda
-			  	oleada_actual->numero_oleada=0;
-    			oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
-    			iniciar_oleada(oleada_actual,enemigo1); //inicializo oleada
-    			oleada_actual->en_transicion=0;
-			  }
-        	
-        }
-    }
-    */
+	}
 }
 
 void renderizar_texto(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y) {
@@ -415,7 +380,7 @@ void inicializar_defensa(Defensa *barricada) {
 	if (!barricada->construida){
     	barricada->vida = 0;
 	}else {
-		barricada->vida = 6;
+		barricada->vida = 10;
 	}
     
 }
@@ -594,10 +559,41 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-	//img de fondo
+	//imgs de fondo
+	/*
     SDL_Texture *fondoTextura = IMG_LoadTexture(renderer, "sprites/fondo.png");
     if (!fondoTextura) {
         printf("No se pudo cargar la textura de fondo: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    */
+    SDL_Texture *fondoDiaTextura = IMG_LoadTexture(renderer, "sprites/fondodia.png");
+    if (!fondoDiaTextura) {
+        printf("No se pudo cargar la textura de fondo dia: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    
+    SDL_Texture *fondoAtardecerTextura = IMG_LoadTexture(renderer, "sprites/fondoatardecer.png");
+    if (!fondoAtardecerTextura) {
+        printf("No se pudo cargar la textura de fondo atardecer: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    
+    SDL_Texture *fondoNocheTextura = IMG_LoadTexture(renderer, "sprites/fondonoche.png");
+    if (!fondoNocheTextura) {
+        printf("No se pudo cargar la textura de fondo noche: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(ventana);
         IMG_Quit();
@@ -625,7 +621,17 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    //inicializacion de registro o entidad jugador y demas entidades necesarias para la logica
+    /*SDL_Texture *vehiculo = IMG_LoadTexture(renderer, "sprites/vehiculo.png");
+    if (!vehiculo) {
+        printf("No se pudo cargar la textura de vehiculo: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(ventana);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+	*/
+	//inicializacion de registro o entidad jugador y demas entidades necesarias para la logica
 	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant, dinero
   	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
 	 // Inicializar los disparos
@@ -1032,9 +1038,7 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-		/*
-		
-		ACA FALTAN VARIABLES PARA CADA UNO DE LOS FONDOS; MAS ARRIBA CERCA DE LAS INICIALIZACIONES
+
 		
 		// Renderizar fondo según el momento del día
     	if (oleada_actual.momento_dia == 1) {
@@ -1044,10 +1048,10 @@ int main(int argc, char *argv[]) {
 	    } else if (oleada_actual.momento_dia == 3) {
 	        SDL_RenderCopy(renderer, fondoNocheTextura, NULL, NULL);
 	    } else if (oleada_actual.momento_dia == 4) {
-	        SDL_RenderCopy(renderer, fondoAmanecerTextura, NULL, NULL);
+	        SDL_RenderCopy(renderer, fondoAtardecerTextura, NULL, NULL);
 	    }
-		*/
-		SDL_RenderCopy(renderer, fondoTextura, NULL, NULL);
+
+		//SDL_RenderCopy(renderer, fondoTextura, NULL, NULL);
 	    
         // Actualización de posición del rectángulo de representación
 		jugador.x = player.x;
@@ -1125,6 +1129,19 @@ int main(int argc, char *argv[]) {
             SDL_RenderDrawRect(renderer, &boton_cerrar);
         }
         
+        // Renderizado de indicador de vida de la barrera
+		if (barricada.construida){
+    		for (i = 0; i < barricada.vida; i++){
+        		SDL_SetRenderDrawColor(renderer, 210, 105, 30, 255);
+        		SDL_Rect barricada_rect = {10 + i * 30, 50, 20, 20};
+        		// Posición 40 píxeles más abajo que el indicador de vida del jugador 
+        		if (i >= barricada.vida){
+            		SDL_SetRenderDrawColor(renderer, 210, 105, 30, 255);
+        		} 
+        		SDL_RenderFillRect(renderer, &barricada_rect);
+    		}	
+		}
+        
         if (mostrarMatriz) {
             // Dibujar matriz
             for (j = 0; j < 3; j++) {
@@ -1176,7 +1193,10 @@ int main(int argc, char *argv[]) {
         SDL_DestroyTexture(matriz[0][j].image);
     }
 	SDL_DestroyTexture(proyectilEnemigo2Textura); 
-	SDL_DestroyTexture(fondoTextura);
+	//SDL_DestroyTexture(fondoTextura);
+	SDL_DestroyTexture(fondoDiaTextura);
+	SDL_DestroyTexture(fondoAtardecerTextura);
+	SDL_DestroyTexture(fondoNocheTextura);
     SDL_DestroyTexture(balaTextura);
     SDL_DestroyTexture(enemigo1Textura);
     SDL_DestroyTexture(enemigo2Textura);
