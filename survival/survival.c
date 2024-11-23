@@ -115,12 +115,6 @@ typedef enum {
 // Tiempos para la duración de cada tipo de animación
 int tiempoFrameReposo = 150;
 int tiempoFrameCaminar = 400;
-
-// Función para detectar colisiones entre dos rectángulos
-int detectarColision(SDL_Rect a, SDL_Rect b) {
-    return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
-}
-
 int i;
 int j;
 
@@ -131,10 +125,12 @@ void iniciar_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
     oleada_actual->tiempo_restante = 30000; // 30 segundos en milisegundos
     oleada_actual->tiempo_transicion = 15000; // 5 segundos de transición/descanso entre oleadas
     oleada_actual->en_transicion = 0;
-    
+    int min = 230;
+	int max = 500;
+	
     for (i = 0; i < MAX_ENEMIGOS; i++) {
         enemigo1[i].x = 1200; // Posición inicial aleatoria
-        enemigo1[i].y = rand() % (750 - 300);
+        enemigo1[i].y = rand() % (max - min + 1) + min; // posicion y aleatoria dentro de los limites verasimiles del puente
         enemigo1[i].ancho = 80;       // Ancho predeterminado
         enemigo1[i].alto = 80;        // Alto predeterminado
         enemigo1[i].activo = 0;       // Activo al inicio
@@ -172,6 +168,8 @@ void generar_moneda(Moneda monedas[MAX_MONEDAS], int x, int y) {
 
 void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual, Oleada *oleada_actual){
 	int i =0;
+	int min = 230;
+	int max = 500;
 	for (i=0; i<MAX_ENEMIGOS; i++){
 		if (enemigo1[i].activo){
 			enemigo1[i].x -= enemigo1[i].velocidad_x;
@@ -188,7 +186,7 @@ void actualizar_enemigo1 (Enemigo1 enemigo1[], Uint32 tiempo_actual, Oleada *ole
             	enemigo1[i].activo = 1;
             	enemigo1[i].vida = 3;
             	enemigo1[i].x = 1200; 
-        		enemigo1[i].y = rand() % (750 - 300);
+        		enemigo1[i].y = rand() % (max - min + 1) + min;
         		oleada_actual->enemigos_activos++;
 		}
 		
@@ -210,6 +208,9 @@ void recibir_dano(Jugador *player, int *game_over) {
  // Función para reiniciar el juego
 void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2, Oleada *oleada_actual) {
         int i = 0;
+        int min = 230;
+		int max = 500;
+	
 		player->x = 640;
         player->y = 300;
         player->dinero = 0;
@@ -221,7 +222,7 @@ void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo
         
         for (i = 0; i < MAX_ENEMIGOS; i++) {
         enemigo1[i].x = 1200; // Posición inicial aleatoria
-        enemigo1[i].y = rand() % (750 - 300);
+        enemigo1[i].y = rand() % (max - min + 1) + min;
         enemigo1[i].ancho = 80;       // Ancho predeterminado
         enemigo1[i].alto = 80;        // Alto predeterminado
         enemigo1[i].activo = 0;       // Activo al inicio
@@ -361,8 +362,14 @@ void inicializar_defensa(Defensa *barricada) {
     barricada->y = 225;           // Fila donde estará la defensa
     barricada->ancho = 40;       // Ancho de la defensa
     barricada->alto = 370;         // Alto de la defensa
-    barricada->construida = 0;    // Inicia como destruida
-    barricada->vida = 0;
+    barricada->construida = rand() % 2;    // Inicia como destruida o construida, tu suerte lo dira
+    
+	if (!barricada->construida){
+    	barricada->vida = 0;
+	}else {
+		barricada->vida = 6;
+	}
+    
 }
 
 void renderizar_defensa(SDL_Renderer *renderer, Defensa *barricada, SDL_Texture *textura_construida, SDL_Texture *textura_destruida) {
@@ -376,13 +383,40 @@ void renderizar_defensa(SDL_Renderer *renderer, Defensa *barricada, SDL_Texture 
 
 void reconstruir_defensa(Defensa *barricada) {
 
-    if (barricada->construida<1){
+    if (!barricada->construida){
     	barricada->construida = 1; // la construyo
+    	barricada->vida=6;
 	}else{
 		barricada->construida = 0; // la destruyo
+		barricada->vida=0;
 	}
 }
 
+void verificar_colision_barrera(Defensa *barricada, Enemigo1 enemigo1[]) {
+	
+    if (!barricada->construida) return;  // Si está destruida, no responder a colisiones
+
+    SDL_Rect rect_barricada = {barricada->x, barricada->y, barricada->ancho, barricada->alto}; // hitbox de la barrera
+    
+    //compruebo colicion con cada uno de ellos 
+    for (i = 0; i < MAX_ENEMIGOS; i++) {
+        if (enemigo1[i].activo) {
+            SDL_Rect rect_enemigo = {enemigo1[i].x, enemigo1[i].y, enemigo1[i].ancho, enemigo1[i].alto};
+            if (SDL_HasIntersection(&rect_barricada, &rect_enemigo)) {
+                // Colisión detectada: reducir vida de la barrera
+                barricada->vida --;  // disminuyo la vida
+                enemigo1[i].activo = 0;  // desactiva al enemigo tras la colisión
+                enemigo1[i].vida =  0;
+            }
+        }
+    }
+
+    // Si la vida llega a 0, destruir la barrera
+    if (barricada->vida <= 0) {
+        barricada->vida = 0;
+        barricada->construida = 0;  // Cambiar el estado a "destruida"
+    }
+}
 
 
 int main(int argc, char *argv[]) {
@@ -852,7 +886,11 @@ int main(int argc, char *argv[]) {
 				if (SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
 					mostrarVentanaEmergente();			
 				}
-			}	
+			}
+			
+			// comprobacion entre interseccion de enemigo 1 con la barricada, falta enemigo 2 por cierto
+			verificar_colision_barrera(&barricada, enemigo1);
+	
 
 		
             if (verificar_fin_oleada(&oleada_actual, enemigo1)) { //devuelve 1 si y solo si enemigos restantes = 0 y termino los 30 segundos de oleada
