@@ -94,6 +94,12 @@ typedef enum {
     ENEMIGO2_ANIMACION
 } Animacion;
 
+typedef struct {
+	int x,y;
+	int ancho,alto;
+	int vida;
+}Vehiculo;
+
 Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
 Uint32 cooldownAtaqueEnemigo2 = 750; // Tiempo entre ataques del enemigo 2
 int atacandoEnemigo2 = 0;            // Estado de ataque del enemigo 2
@@ -126,6 +132,14 @@ int tiempoFrameReposo = 150;
 int tiempoFrameCaminar = 400;
 int i;
 int j;
+
+void inicializar_vehiculo(Vehiculo *vehiculo){
+    vehiculo->x = 10;
+    vehiculo->y = 300;
+    vehiculo->ancho = 325;
+    vehiculo->alto = 225;
+    vehiculo->vida = (rand() % 5) + 3; // Valor aleatorio entre 3 y 7
+}
 
 void iniciar_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
 	
@@ -215,7 +229,7 @@ void recibir_dano(Jugador *player, int *game_over) {
     }
     
  // Función para reiniciar el juego
-void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2, Oleada *oleada_actual) {
+void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2, Oleada *oleada_actual, Vehiculo *vehiculo) {
         int i = 0;
         int min = 230;
 		int max = 500;
@@ -260,6 +274,8 @@ void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo
     	enemigo2->tiempoAnterior = SDL_GetTicks();
     	enemigo2->tiempoReaparicion = 0;
     	
+    	inicializar_vehiculo(vehiculo);
+    	
         printf("Juego reiniciado.\n");
 }
 
@@ -277,7 +293,6 @@ int verificar_fin_oleada(Oleada *oleada_actual, Enemigo1 enemigo1[]) {
 }
 
 // manejo de la transicion o momento entre oleadas y/o estado del dia
-
 void manejar_transicion(Oleada *oleada_actual, Uint32 delta_tiempo,Enemigo1 enemigo1[]) {
     if (oleada_actual->tiempo_transicion > delta_tiempo){
     	// si entra aca, estoy esperando 15 segundos de descanso
@@ -371,7 +386,7 @@ void mostrar_cronometro(SDL_Renderer *renderer, TTF_Font *fuente, Oleada *oleada
 }
 
 void inicializar_defensa(Defensa *barricada) {
-    barricada->x = 100;           // Posición inicial
+    barricada->x = 350;           // Posición inicial
     barricada->y = 225;           // Fila donde estará la defensa
     barricada->ancho = 40;       // Ancho de la defensa
     barricada->alto = 370;         // Alto de la defensa
@@ -441,6 +456,66 @@ SDL_Texture *cargarTextura(SDL_Renderer *renderer, const char *ruta) {
     SDL_Texture *textura = SDL_CreateTextureFromSurface(renderer, superficie);
     SDL_FreeSurface(superficie);
     return textura;
+}
+
+void detectar_colision_vehiculo(SDL_Rect vehiculoRect, Vehiculo *vehiculo, Enemigo1 enemigo1[]) {
+
+    int linea_colision = vehiculoRect.x + vehiculoRect.w - 10; // seran 10 pixeles "sobrepasados" para considerarse una "colicion" entre el enemigo y el vehiculo
+    // esto nos asegura de que por mas inverosimil que paresca esta colicion, se produsca, ya que solo toma en cuenta el eje x y no el y
+	for (i = 0; i < MAX_ENEMIGOS; i++) {
+        if (enemigo1[i].activo) {
+            // Comprobar si el enemigo "sobrepasa" la línea de colisión
+            if (enemigo1[i].x <= linea_colision) {
+                // Daño al vehículo
+                vehiculo->vida--;
+                // Desactivar al enemigo
+                enemigo1[i].activo = 0;
+                enemigo1[i].vida = 0;
+
+                printf("¡Colisión detectada! Vida del vehículo: %d\n", vehiculo->vida);
+            }
+        }
+    }
+}
+
+// renderizar vida vehiculo
+void renderizar_vida_vehiculo(SDL_Renderer *renderer, Vehiculo *vehiculo) {
+    for (i = 0; i < vehiculo->vida; i++){
+        // Color verde apagado (34, 139, 34)
+        SDL_SetRenderDrawColor(renderer, 34, 139, 34, 255);
+        
+        // Rectángulo para cada "unidad" de vida
+        SDL_Rect vida_rect = {10 + i * 30, 40, 20, 20}; // Posición y tamaño del rectángulo
+        
+        SDL_RenderFillRect(renderer, &vida_rect); // Renderizar rectángulo
+    }
+}
+
+//renderizar vida jugador
+void renderizar_vida_jugador(SDL_Renderer *renderer, Jugador *player) {
+	for (i = 0; i < player->salud; i++) {
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            SDL_Rect vida_rect = {10 + i * 30, 10, 20, 20};
+            if (i >= player->salud) {
+                SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
+            }
+            SDL_RenderFillRect(renderer, &vida_rect);
+        }
+}
+
+//renderizar vida barricada
+void renderizar_vida_barricada(SDL_Renderer *renderer, Defensa *barricada) {
+	if (barricada->construida){
+    		for (i = 0; i < barricada->vida; i++){
+        		SDL_SetRenderDrawColor(renderer, 210, 105, 30, 255);
+        		SDL_Rect barricada_rect = {10 + i * 30, 70, 20, 20};
+        		// Posición 40 píxeles más abajo que el indicador de vida del jugador 
+        		if (i >= barricada->vida){
+            		SDL_SetRenderDrawColor(renderer, 210, 105, 30, 255);
+        		} 
+        		SDL_RenderFillRect(renderer, &barricada_rect);
+    		}	
+		}
 }
 
 int main(int argc, char *argv[]) {
@@ -559,18 +634,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-	//imgs de fondo
-	/*
-    SDL_Texture *fondoTextura = IMG_LoadTexture(renderer, "sprites/fondo.png");
-    if (!fondoTextura) {
-        printf("No se pudo cargar la textura de fondo: %s\n", IMG_GetError());
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(ventana);
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
-    */
     SDL_Texture *fondoDiaTextura = IMG_LoadTexture(renderer, "sprites/fondodia.png");
     if (!fondoDiaTextura) {
         printf("No se pudo cargar la textura de fondo dia: %s\n", IMG_GetError());
@@ -621,8 +684,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    /*SDL_Texture *vehiculo = IMG_LoadTexture(renderer, "sprites/vehiculo.png");
-    if (!vehiculo) {
+    SDL_Texture *vehiculoTextura = IMG_LoadTexture(renderer, "sprites/vehiculo.png");
+    if (!vehiculoTextura) {
         printf("No se pudo cargar la textura de vehiculo: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(ventana);
@@ -630,7 +693,7 @@ int main(int argc, char *argv[]) {
         SDL_Quit();
         return 1;
     }
-	*/
+	
 	//inicializacion de registro o entidad jugador y demas entidades necesarias para la logica
 	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant, dinero
   	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
@@ -648,7 +711,10 @@ int main(int argc, char *argv[]) {
     iniciar_oleada(&oleada_actual,enemigo1); //inicializo oleada
     //inicializar barricadas
     Defensa barricada;
+    Vehiculo vehiculo;
+    inicializar_vehiculo(&vehiculo);
     inicializar_defensa(&barricada);
+    
     // Crear la matriz 1x3
     Celda matriz[1][3];
     const char *imagenes[3] = {
@@ -669,7 +735,6 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    //int i= 0;
     for ( i = 0; i < MAX_DISPAROS; i++) {
         disparos[i].activo = 0;
     }
@@ -823,7 +888,7 @@ int main(int argc, char *argv[]) {
                 // logica para cerrar y reiniciar la app segun ubicacion y accion de el raton
                 
                 if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_reintentar)) {
-                    reiniciar_juego(&player, disparos, &game_over, enemigo1,&enemigo2,&oleada_actual);
+                    reiniciar_juego(&player, disparos, &game_over, enemigo1,&enemigo2,&oleada_actual,&vehiculo);
                 }
                 
 				if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_cerrar)) {
@@ -1084,7 +1149,8 @@ int main(int argc, char *argv[]) {
     		}
     		SDL_Rect enemigo2DstRect = {enemigo2.x, enemigo2.y, enemigo2.ancho, enemigo2.alto};
     		SDL_RenderCopy(renderer, enemigo2Textura, &enemigo2SrcRect, &enemigo2DstRect);
-		}	
+		}
+			
 		//colicion/ interseccion entre jugador y moneda
 		SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
 		
@@ -1111,14 +1177,7 @@ int main(int argc, char *argv[]) {
 		}
 		
 		// renderizado de Indicador de vida
-        for (i = 0; i < player.salud; i++) {
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-            SDL_Rect vida_rect = {10 + i * 30, 10, 20, 20};
-            if (i >= player.salud) {
-                SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
-            }
-            SDL_RenderFillRect(renderer, &vida_rect);
-        }
+        renderizar_vida_jugador(renderer, &player);
   		
   		// Mostrar menú de Game Over
         if (game_over) {
@@ -1129,18 +1188,10 @@ int main(int argc, char *argv[]) {
             SDL_RenderDrawRect(renderer, &boton_cerrar);
         }
         
-        // Renderizado de indicador de vida de la barrera
-		if (barricada.construida){
-    		for (i = 0; i < barricada.vida; i++){
-        		SDL_SetRenderDrawColor(renderer, 210, 105, 30, 255);
-        		SDL_Rect barricada_rect = {10 + i * 30, 50, 20, 20};
-        		// Posición 40 píxeles más abajo que el indicador de vida del jugador 
-        		if (i >= barricada.vida){
-            		SDL_SetRenderDrawColor(renderer, 210, 105, 30, 255);
-        		} 
-        		SDL_RenderFillRect(renderer, &barricada_rect);
-    		}	
-		}
+        // Renderizado de indicador de vida de la barricada
+		renderizar_vida_barricada(renderer, &barricada);
+		
+		
         
         if (mostrarMatriz) {
             // Dibujar matriz
@@ -1175,11 +1226,19 @@ int main(int argc, char *argv[]) {
         // Dibujar el texto
         SDL_RenderCopy(renderer, texturaTexto, NULL, &rectTexto);
         SDL_DestroyTexture(texturaTexto);
-    
+    	
+    	// renderizar rectangulo qeu contendra la textura del vehiculo
+		SDL_Rect vehiculoRect = {vehiculo.x, vehiculo.y, vehiculo.ancho, vehiculo.alto};
+		// copiar textura en el rectangulo del vehiculo y renderizarlo
+ 		SDL_RenderCopy(renderer, vehiculoTextura, NULL, &vehiculoRect);
+ 		//verificamos colicion de enemigos con vehiculo
+ 		detectar_colision_vehiculo(vehiculoRect, &vehiculo, enemigo1);
+		
+		//renderizado de indicador de vida del vehiculo
+		renderizar_vida_vehiculo(renderer, &vehiculo);
+		
         mostrar_oleadas(renderer, fuente, oleada_actual.numero_oleada, oleada_actual.oleada_maxima);
-  		
   		mostrar_cronometro(renderer, fuente, &oleada_actual);
-  		
   		renderizar_defensa(renderer, &barricada, textura_defensa_construida, textura_defensa_destruida);
 
   		
@@ -1192,8 +1251,7 @@ int main(int argc, char *argv[]) {
 	 for (j = 0; j < 3; j++) {
         SDL_DestroyTexture(matriz[0][j].image);
     }
-	SDL_DestroyTexture(proyectilEnemigo2Textura); 
-	//SDL_DestroyTexture(fondoTextura);
+	SDL_DestroyTexture(proyectilEnemigo2Textura);
 	SDL_DestroyTexture(fondoDiaTextura);
 	SDL_DestroyTexture(fondoAtardecerTextura);
 	SDL_DestroyTexture(fondoNocheTextura);
@@ -1201,6 +1259,7 @@ int main(int argc, char *argv[]) {
     SDL_DestroyTexture(enemigo1Textura);
     SDL_DestroyTexture(enemigo2Textura);
     SDL_DestroyTexture(jugadorTextura);
+    SDL_DestroyTexture(vehiculoTextura);
     SDL_DestroyTexture(textura_defensa_construida);
 	SDL_DestroyTexture(textura_defensa_destruida);
     TTF_CloseFont(fuente);
