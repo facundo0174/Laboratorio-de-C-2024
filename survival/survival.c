@@ -15,7 +15,7 @@ void mostrarVentanaEmergente() {
 // algunas veces el igual no hace falta, por ejemplo los casos de eventos, ya que solo necesitamos tener/nombrar una variable para acceder a ellos ya que
 // son recolectados de manera transparente al programador.
 // * es para declarar punteros o acceder a ellos, mientras que & es para apuntar a la direccion de memoria
-typedef struct {
+typedef struct { //DISPARO
     int x, y;               // Posición del disparo
     int ancho, alto;        // Tamaño del disparo
     int activo;             // Si el disparo está en pantalla
@@ -23,7 +23,7 @@ typedef struct {
 } Disparo;
 
 // Definición de estructuras para representar enemigos y disparos en el juego
-typedef struct {
+typedef struct { //ENEMIGO 1
     int x, y;                    // Posición
     int ancho, alto;             // Tamaño
     int activo;                  // Estado activo/inactivo
@@ -35,18 +35,7 @@ typedef struct {
     int vida;
 } Enemigo1;
 
-typedef struct {
-    int x, y;                    // Posición
-    int ancho, alto;             // Tamaño
-    int activo;                  // Estado activo/inactivo
-    int velocidad_x;             // Velocidad horizontal
-    int frameActual;             // Frame actual de la animación
-    int tiempoFrame;             // Duración de cada frame en ms
-    Uint32 tiempoAnterior;       // Marca de tiempo del último frame
-    Uint32 tiempoReaparicion;    // Tiempo de reaparición después de ser desactivado
-} Enemigo2;
-
-typedef struct {
+typedef struct { //JUGADOR
 	int x, y;            // Posición en la pantalla
     int ancho, alto;   // Dimensiones del jugador
     int salud;           // Salud del jugador
@@ -56,7 +45,7 @@ typedef struct {
     int ultima_direccion_y;
 } Jugador;
 
-typedef struct {
+typedef struct { //MONEDA
     int x, y;               // Posición de la moneda
     int ancho, alto;        // Tamaño de la moneda
     int activo;             // Si la moneda está en pantalla
@@ -65,7 +54,7 @@ typedef struct {
     Uint32 intervalo_frame; // Tiempo entre frames
 } Moneda;
 
-typedef struct {
+typedef struct { //OLEADA
     int numero_oleada;        // oleadas faltantes
     int oleada_maxima;         // maximo de oleada
     int enemigos_activos;     // enemigos vivos en pantalla
@@ -75,7 +64,7 @@ typedef struct {
     int momento_dia; 		  // 1 dia, 2 atardecer, 3 noche, 4 amanecer
 } Oleada;
 
-typedef struct {
+typedef struct {// BARRERA
 	int x, y;             // Posición
     int ancho, alto;      // Tamaño
     int construida;       // 0 = destruida, 1 = construida
@@ -89,12 +78,11 @@ typedef struct {
 } Celda;
 
 // Enumeración para controlar el tipo de animación
-typedef enum {
+typedef enum { //ANIMACION
     REPOSO,
     CAMINAR,
     DISPARO,
     ENEMIGO1_ANIMACION,
-    ENEMIGO2_ANIMACION
 } Animacion;
 
 typedef struct {
@@ -103,22 +91,14 @@ typedef struct {
 	int vida;
 }Vehiculo;
 
-Uint32 tiempoAtaqueEnemigo2 = 0;     // Tiempo del último ataque del enemigo 2
-Uint32 cooldownAtaqueEnemigo2 = 750; // Tiempo entre ataques del enemigo 2
-int atacandoEnemigo2 = 0;            // Estado de ataque del enemigo 2
 Uint32 tiempo_actual;
 // Constantes para controlar las animaciones, velocidad y dimensiones de los sprites
-#define FRAMES_PROYECTIL_ENEMIGO2 6
-#define FRAMES_ATAQUE_ENEMIGO2 4
-#define VELOCIDAD_PROYECTIL_ENEMIGO2 8
-#define LIMITE_ATAQUE_X 0.4 // Límite de ataque como porcentaje de ancho de la pantalla
 #define ANCHO_FRAME 32
 #define ALTO_FRAME 32
 #define FRAMES_REPOSO 4
 #define FRAMES_CAMINAR 4
 #define FRAMES_DISPARO 4
 #define FRAMES_ENEMIGO1 4
-#define FRAMES_ENEMIGO2 3
 #define VELOCIDAD_DISPARO 10
 #define TIEMPO_REAPARICION_ENEMIGO 3000 // Tiempo de reaparición del enemigo en ms
 #define MAX_DISPAROS 10
@@ -128,8 +108,6 @@ Uint32 tiempo_actual;
 #define CELL_WIDTH 190 // Ancho reducido para separación
 #define CELL_HEIGHT 140 // Alto reducido para separación
 #define CELL_SPACING 10 // Separación entre celdas
-
-Disparo disparosEnemigo2[MAX_DISPAROS];
 // Tiempos para la duración de cada tipo de animación
 int tiempoFrameReposo = 150;
 int tiempoFrameCaminar = 400;
@@ -235,7 +213,7 @@ void recibir_dano(Jugador *player, int *game_over) {
     }
     
  // Función para reiniciar el juego
-void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Enemigo2 *enemigo2, Oleada *oleada_actual, Vehiculo *vehiculo) {
+void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo1 enemigo1[], Oleada *oleada_actual, Vehiculo *vehiculo) {
         int i = 0;
         int min = 230;
 		int max = 500;
@@ -267,19 +245,7 @@ void reiniciar_juego(Jugador *player, Disparo disparos[], int *game_over,Enemigo
     	oleada_actual->numero_oleada=0;
     	oleada_actual->oleada_maxima = (rand() % 5) + 1; //posibles oleadas entre 1 y 5
     	iniciar_oleada(oleada_actual,enemigo1); //inicializo oleada
-    	
-    	
-    	enemigo2->x = 1000;
-    	enemigo2->y = 300;
-    	enemigo2->ancho = 80;
-    	enemigo2->alto = 80;
-    	enemigo2->activo = 1;
-    	enemigo2->velocidad_x = 3;
-    	enemigo2->frameActual = 0;
-    	enemigo2->tiempoFrame = 200;
-    	enemigo2->tiempoAnterior = SDL_GetTicks();
-    	enemigo2->tiempoReaparicion = 0;
-    	
+		    	
     	inicializar_vehiculo(vehiculo);
     	
         printf("Juego reiniciado.\n");
@@ -557,8 +523,6 @@ int main(int argc, char *argv[]) {
 	srand(time(NULL));  // Inicializar el generador de números aleatorios
     // Inicializar SDL y SDL_image
     
-    
-    
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("No se pudo inicializar SDL: %s\n", SDL_GetError());
         return 1;
@@ -635,26 +599,6 @@ int main(int argc, char *argv[]) {
     SDL_Texture *enemigo1Textura = IMG_LoadTexture(renderer, "sprites/enemigo1.png");
     if (!enemigo1Textura) {
         printf("No se pudo cargar la textura de enemigo1: %s\n", IMG_GetError());
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(ventana);
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
-    
-    SDL_Texture *enemigo2Textura = IMG_LoadTexture(renderer, "sprites/enemigo2.png");
-    if (!enemigo2Textura) {
-        printf("No se pudo cargar la textura de enemigo2: %s\n", IMG_GetError());
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(ventana);
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
-   
-    SDL_Texture *proyectilEnemigo2Textura = IMG_LoadTexture(renderer, "sprites/proyectilEnemigo2.png");
-    if (!proyectilEnemigo2Textura) {
-        printf("No se pudo cargar la textura de proyectil enemigo: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(ventana);
         IMG_Quit();
@@ -805,14 +749,10 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    for ( i = 0; i < MAX_DISPAROS; i++) {
+    for (i = 0; i < MAX_DISPAROS; i++) {
         disparos[i].activo = 0;
     }
-    
-    for (i = 0; i < MAX_DISPAROS; i++) {
-        disparosEnemigo2[i].activo = 0;
-	}
-	
+    	
 	for (i = 0; i < MAX_MONEDAS; i++){
 		monedas[i].activo = 0;
 	} 
@@ -820,7 +760,6 @@ int main(int argc, char *argv[]) {
      // Variables para el cooldown de disparo
     Uint32 ultimo_disparo = 0;
     Uint32 cooldown = 500; // 500 milisegundos
-    Enemigo2 enemigo2 = {1000, 300, 80, 80, 1, 3, 0, 200, SDL_GetTicks(), 0};
     int game_over = 0; //nesesario para logica de restart 
     int frameActual = 0;
     int tiempoFrame = 100;
@@ -858,10 +797,6 @@ int main(int argc, char *argv[]) {
     	// Verificar si el juego ha terminado
     	if (game_over) {
         	// Mostrar pantalla de fin de juego
-        	// Aquí podrías usar la función de mostrar la ventana de "Game Over"
-        	// También podrías pausar el fondo o mostrar un mensaje hasta que el jugador decida reiniciar o salir.
-			
-        	// Evento de pausar el juego y esperar acción del usuario (Reiniciar o salir)
         	while (game_over) {
             	// Procesar eventos mientras el juego está en "Game Over"
             	while (SDL_PollEvent(&evento)) {
@@ -874,7 +809,7 @@ int main(int argc, char *argv[]) {
 	                    SDL_GetMouseState(&mouse_x, &mouse_y);
 	                    // Verificar si se ha presionado el botón "Reintentar"
 	                    if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_reintentar)) {
-	                        reiniciar_juego(&player, disparos, &game_over, enemigo1, &enemigo2, &oleada_actual, &vehiculo);
+	                        reiniciar_juego(&player, disparos, &game_over, enemigo1, &oleada_actual, &vehiculo);
 	                    }
 	                    // Verificar si se ha presionado el botón "Salir"
 	                    if (SDL_PointInRect(&(SDL_Point){mouse_x, mouse_y}, &boton_cerrar)) {
@@ -908,7 +843,7 @@ int main(int argc, char *argv[]) {
     	                   	player.y += player.velocidad;
 	                       	enMovimiento = 1;
 	                        animacionActual = CAMINAR;
-	    	                    player.ultima_direccion_x = 0; 
+	    	                player.ultima_direccion_x = 0; 
 	                        player.ultima_direccion_y = 1;
 	                        break;
                         
@@ -986,6 +921,56 @@ int main(int argc, char *argv[]) {
     	            // Comprobar si se seleccionó una celda
         	        for (j = 0; j < 3; j++) {
             	        if (SDL_PointInRect(&(SDL_Point){x, y}, &matriz[0][j].rect)) {
+            	        	switch (j){
+            	        		case 0: //  reparar barrera
+            	        			if ((player.dinero - 20)<0){
+            	        				printf("EN TERMINOS DE DINERO; NO TIENES DINERO PARA RECONSTRUIR LA BARRICADA");
+            	        				break;
+									}else{									
+										if( barricada.construida){
+											if (barricada.vida >=10){
+												printf("NO PUEDES SUBIR MAS LA VIDA");
+											}else{
+												barricada.vida ++;
+												printf("barricada aumentada en 1 su vida");
+												player.dinero-=20;
+											}
+											}else{
+												barricada.construida=1;
+												barricada.vida=10;
+												printf("BARRICADA CONSTRUIDA");	
+												player.dinero-=20;									
+											}
+										}
+            	        			break;
+            	        		case 1://  reparar auto
+            	        			if ((player.dinero - 30)<0){
+            	        				printf("EN TERMINOS DE DINERO; NO TIENES DINERO PARA REPARAR EL VEHICULO");
+            	        				break;
+									}else{									
+										if( vehiculo.vida < 10){
+											vehiculo.vida++;
+											player.dinero-= 30;
+											printf("HAS REPARADO PARTE DEL VEHICULO");
+										}else{// si es igual a 10 entonces debo colocar gameover
+												printf("YA REPARASTE EN SU TOTALIDAD EL VEHICULO");
+										}									
+									}           	        			
+            	        			break;
+            	        		case 2: // aumentar salud
+            	        			if ((player.dinero - 20)<0){
+            	        				printf("EN TERMINOS DE DINERO; NO TIENES DINERO PARA RECUPERAR HP");
+            	        				break;
+									}else {
+										if (player.salud < 10){
+											player.salud ++;
+											player.dinero-=15;
+										}else {
+											printf("NO PUEDES SUBIR MAS LA VIDA");
+										}
+									}            	        			
+            	        			break;
+            	        	}
                 	        printf("Seleccionaste la celda [0][%d]\n", j);
 	                    }
 					}
@@ -1000,88 +985,7 @@ int main(int argc, char *argv[]) {
 	        }else { // si no es una transicion o intermedio, estas en una oleada
 	            actualizar_cronometro(&oleada_actual, delta_tiempo);
 	            actualizar_enemigo1(enemigo1,tiempo_actual,&oleada_actual);
-	            
-	            // actualizacion de reaparicion de enemigo 2
-	        	if (!enemigo2.activo && SDL_GetTicks() > enemigo2.tiempoReaparicion) {
-		    		printf("Reapareciendo enemigo 2\n"); // Mensaje de depuración
-	    			enemigo2.activo = 1;
-	    			enemigo2.x = 1024;
-	    			enemigo2.y = rand() % 600;
-	    			atacandoEnemigo2 = 0;
-	    			enemigo2.frameActual = 0;
-				}
 		
-				//logica de animacion y ataque automatico de enemigo 2, el cual ataca a distancia
-		
-				if (enemigo2.activo) {
-	    			// Movimiento del enemigo
-    				if (!atacandoEnemigo2) {
-	        			enemigo2.x -= enemigo2.velocidad_x;
-	    			}
-	
-		    		if (!atacandoEnemigo2 && enemigo2.x < 1024 * (1 - LIMITE_ATAQUE_X)) {
-	    	    		atacandoEnemigo2 = 1;
-	        			tiempoAtaqueEnemigo2 = SDL_GetTicks();
-	        			enemigo2.frameActual = 0;
-    				}
-					//logica de disparos de enemigo 2
-	    			if (atacandoEnemigo2) {
-				        if (SDL_GetTicks() > enemigo2.tiempoAnterior + enemigo2.tiempoFrame) {
-		    		        enemigo2.frameActual = (enemigo2.frameActual + 1) % FRAMES_ATAQUE_ENEMIGO2;
-		        		    enemigo2.tiempoAnterior = SDL_GetTicks();
-		        		}	
-			
-			        	if (SDL_GetTicks() > tiempoAtaqueEnemigo2 + cooldownAtaqueEnemigo2) {
-		    	        	for (i = 0; i < MAX_DISPAROS; i++) {
-		        	        	if (!disparosEnemigo2[i].activo) {
-		            	        	disparosEnemigo2[i].activo = 1;
-	        	        	    	disparosEnemigo2[i].x = enemigo2.x;
-    		                		disparosEnemigo2[i].y = enemigo2.y + enemigo2.alto / 2;
-	        		            	disparosEnemigo2[i].ancho = 32;
-    			       	        	disparosEnemigo2[i].alto = 32;
-        	       		 	    	disparosEnemigo2[i].direccion_x = -1;
-            	        			tiempoAtaqueEnemigo2 = SDL_GetTicks();
-                	    			break;
-	                			}
-			            	}
-    			    	}
-	    			}else {//actualizacion de contador para realizar frames de animaciones
-	    				if (SDL_GetTicks() > enemigo2.tiempoAnterior + enemigo2.tiempoFrame) {
-		    	        enemigo2.frameActual = (enemigo2.frameActual + 1) % FRAMES_ENEMIGO2;
-    		    	    enemigo2.tiempoAnterior = SDL_GetTicks();
-	        			}
-    				}
-    	
-			    	//si la figura del enemigo exede cierto valor de pantalla, se desactiva
-	    			if (enemigo2.x < -enemigo2.ancho) {
-				        printf("Desactivando enemigo 2\n"); // Mensaje de depuración
-		        		enemigo2.activo = 0;
-		        		atacandoEnemigo2 = 0;
-				        	enemigo2.tiempoReaparicion = SDL_GetTicks() + TIEMPO_REAPARICION_ENEMIGO;
-		    		}
-	    		}
-			
-				for (i = 0; i < MAX_DISPAROS; i++) {
-    				if (disparosEnemigo2[i].activo) {
-	    	    		disparosEnemigo2[i].x += disparosEnemigo2[i].direccion_x * VELOCIDAD_PROYECTIL_ENEMIGO2;
-	        		
-						// Desactivar el proyectil si sale de la pantalla
-    	   		
-						if (disparosEnemigo2[i].x < 0 || disparosEnemigo2[i].x > 1024) {
-    		    	    	disparosEnemigo2[i].activo = 0;
-			        	}
-	        
-			        	// Renderizar el proyectil
-				        SDL_Rect proyectilRect = {disparosEnemigo2[i].x, disparosEnemigo2[i].y, disparosEnemigo2[i].ancho, disparosEnemigo2[i].alto};
-						proyectilRect.w = 64; // Ancho deseado
-        				proyectilRect.h = 64;
-						// Asume que el proyectil tiene varias frames horizontales en el spritesheet
-						int frameProyectil = (SDL_GetTicks() / 100) % FRAMES_PROYECTIL_ENEMIGO2;  // Ajusta 100 para cambiar la velocidad de animación
-						SDL_Rect srcProyectilEnemigo2 = {frameProyectil * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
-						SDL_RenderCopy(renderer, proyectilEnemigo2Textura, &srcProyectilEnemigo2, &proyectilRect);
-        			}
-				}
-			
 				// comprobacion de colicion entre disparos y enemigos
 				for (i = 0; i < MAX_DISPAROS; i++) {
         	    	if (disparos[i].activo) {
@@ -1104,17 +1008,6 @@ int main(int argc, char *argv[]) {
 								}
 							}
 						}
-                				
-						//comprobacion de colivion entre enemigos tipo 2 y la bala
-				
-		                if (enemigo2.activo) {
-							SDL_Rect enemigo2Rect = {enemigo2.x+15 , enemigo2.y + 20, 40, 40};
-							if (SDL_HasIntersection(&rect_disparo,&enemigo2Rect)){
-								disparos[i].activo = 0;
-    	            	    	enemigo2.activo = 0;
-        	            		enemigo2.tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;								
-							}
-						}
     	        	}
         		}
 			
@@ -1132,16 +1025,8 @@ int main(int argc, char *argv[]) {
 						}
 					}
 				}
-			
-				if (enemigo2.activo){ //interseccion con enemigo 2
-					SDL_Rect enemigo2Rect = {enemigo2.x + 15, enemigo2.y + 20, 40, 40};
-					if (SDL_HasIntersection (&jugadorHitbox, &enemigo2Rect)){
-						player.salud --;
-						printf("¡¡TU SALUD A SIDO DEVALUADA!!, su valor actual es: %d\n", player.salud);			
-					}
-				}
-			
-				// comprobacion entre interseccion de enemigo 1 con la barricada, falta enemigo 2 por cierto
+
+				// comprobacion entre interseccion de enemigo 1 con la barricada
 				verificar_colision_barrera(&barricada, enemigo1);
 		
 	            if (verificar_fin_oleada(&oleada_actual, enemigo1)) { //devuelve 1 si y solo si enemigos restantes = 0 y termino los 30 segundos de oleada
@@ -1232,19 +1117,7 @@ int main(int argc, char *argv[]) {
                 	SDL_RenderCopy(renderer, enemigo1Textura, &enemigo1SrcRect, &enemigo1DstRect);
 	            }
 			}
-		
-			// renderizado para el mago y renderizados de su disparo si existe
-    	    if (enemigo2.activo) {
-	    		SDL_Rect enemigo2SrcRect;
-    			if (atacandoEnemigo2) {
-        			enemigo2SrcRect = (SDL_Rect){enemigo2.frameActual * ANCHO_FRAME, ALTO_FRAME, ANCHO_FRAME, ALTO_FRAME};
-    			} else {
-	        		enemigo2SrcRect = (SDL_Rect){enemigo2.frameActual * ANCHO_FRAME, 0, ANCHO_FRAME, ALTO_FRAME};
-    			}
-	    		SDL_Rect enemigo2DstRect = {enemigo2.x, enemigo2.y, enemigo2.ancho, enemigo2.alto};
-    			SDL_RenderCopy(renderer, enemigo2Textura, &enemigo2SrcRect, &enemigo2DstRect);
-			}
-			
+				
 			//colicion/ interseccion entre jugador y moneda
 			SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
 		
@@ -1350,13 +1223,11 @@ int main(int argc, char *argv[]) {
 	 for (j = 0; j < 3; j++) {
         SDL_DestroyTexture(matriz[0][j].image);
     }
-	SDL_DestroyTexture(proyectilEnemigo2Textura);
 	SDL_DestroyTexture(fondoDiaTextura);
 	SDL_DestroyTexture(fondoAtardecerTextura);
 	SDL_DestroyTexture(fondoNocheTextura);
     SDL_DestroyTexture(balaTextura);
     SDL_DestroyTexture(enemigo1Textura);
-    SDL_DestroyTexture(enemigo2Textura);
     SDL_DestroyTexture(jugadorTextura);
     SDL_DestroyTexture(vehiculoTextura);
     SDL_DestroyTexture(textura_defensa_construida);
