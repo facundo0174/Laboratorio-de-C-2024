@@ -19,7 +19,7 @@ typedef struct { //DISPARO
     int x, y;               // Posición del disparo
     int ancho, alto;        // Tamaño del disparo
     int activo;             // Si el disparo está en pantalla
-    int direccion_x, direccion_y; // Dirección de movimiento
+    int direccion_x; // Dirección de movimiento
 } Disparo;
 
 // Definición de estructuras para representar enemigos y disparos en el juego
@@ -42,7 +42,6 @@ typedef struct { //JUGADOR
     int dinero;          //Dinero del jugador
     int velocidad;       // Velocidad de movimiento
     int ultima_direccion_x;  //valores de resguardo para direccionar las balas en un sentido u otro
-    int ultima_direccion_y;
 } Jugador;
 
 typedef struct { //MONEDA
@@ -709,7 +708,7 @@ int main(int argc, char *argv[]) {
     }
 	
 	//inicializacion de registro o entidad jugador y demas entidades necesarias para la logica
-	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1, 0}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant, dinero
+	Jugador player = {640, 300, 80, 80, VIDA_DEFAULT, 0, 5, 1}; //pos x, pos y, ancho, alto, salud, dinero, velocidad, x ant, y ant, dinero
   	SDL_Rect jugador = {player.x, player.y, player.ancho, player.alto};
 	 // Inicializar los disparos
     Disparo disparos[MAX_DISPAROS];
@@ -782,7 +781,7 @@ int main(int argc, char *argv[]) {
     // los eventos pueden ser de raton, teclado o joystick, todos tienen palabras reservadas down y up, referenciando la accion de apretar y soltar respectivamente
     // se debe configurar ambos de lo contrario la accion se volvera perpetua
 	int velocidad = 5; //velocidad traducida en 5 pixeles por bucle segun x accion de desplazamiento en cada eje
-	Disparo disparo = {0, 0, 6, 2, 0, 0, 0}; // inicializamos la entidad disparo desactivada, los parametros son correspondientes y posicionales al struct
+	Disparo disparo = {0, 0, 6, 2, 0, 0}; // inicializamos la entidad disparo desactivada, los parametros son correspondientes y posicionales al struct
     int mostrarMatriz = 0; // variable utilizada para logica de la tienda
     
     
@@ -833,8 +832,7 @@ int main(int argc, char *argv[]) {
                          	player.y -= player.velocidad;
                          	enMovimiento = 1;
                         	animacionActual = CAMINAR;
-						 	player.ultima_direccion_x = 0; 
-                        	player.ultima_direccion_y = -1;
+						 	player.ultima_direccion_x = player.ultima_direccion_x; 
                         	
 						break;
 						
@@ -843,8 +841,7 @@ int main(int argc, char *argv[]) {
     	                   	player.y += player.velocidad;
 	                       	enMovimiento = 1;
 	                        animacionActual = CAMINAR;
-	    	                player.ultima_direccion_x = 0; 
-	                        player.ultima_direccion_y = 1;
+	    	                player.ultima_direccion_x = player.ultima_direccion_x; 
 	                        break;
                         
 	                    case SDLK_a: 
@@ -854,7 +851,6 @@ int main(int argc, char *argv[]) {
 	                        flip = SDL_FLIP_HORIZONTAL;
     	                    animacionActual = CAMINAR;
         	            	player.ultima_direccion_x = -1; 
-	                        player.ultima_direccion_y = 0;
 							break;
 						
 	                    case SDLK_d: 
@@ -864,7 +860,6 @@ int main(int argc, char *argv[]) {
     	                    flip = SDL_FLIP_NONE;
     	                    animacionActual = CAMINAR;
 							player.ultima_direccion_x = 1; 
-	                        player.ultima_direccion_y = 0;
     	                    break;
                         
         	            case SDLK_j:// disparo con la letra "j"
@@ -877,7 +872,6 @@ int main(int argc, char *argv[]) {
                         	                disparos[i].ancho = 20;
                             	            disparos[i].alto = 20;
             	                            disparos[i].direccion_x = player.ultima_direccion_x;
-	                                        disparos[i].direccion_y = player.ultima_direccion_y;
     	                                    ultimo_disparo = SDL_GetTicks();
         	                            	animacionActual = DISPARO;
                 	                    	tiempoInicioDisparo = SDL_GetTicks();
@@ -1076,11 +1070,8 @@ int main(int argc, char *argv[]) {
 	    	//renderizado y comprobacion de disparos
 			for (i = 0; i < MAX_DISPAROS; i++) {
 				    if (disparos[i].activo) {
-				    	
-
 				        SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
 				        SDL_RenderCopy(renderer, balaTextura, NULL, &rect_disparo);
-				        printf("renderizo la bala");
 				    }
 				}
 		
