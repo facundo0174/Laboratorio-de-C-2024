@@ -974,6 +974,7 @@ int main(int argc, char *argv[]) {
                 	        printf("Seleccionaste la celda [0][%d]\n", j);
 	                    }
 					}
+					
         		}
         	}
         	//termina adm eventos
@@ -984,33 +985,7 @@ int main(int argc, char *argv[]) {
 	            manejar_transicion(&oleada_actual, delta_tiempo, enemigo1); 
 	        }else { // si no es una transicion o intermedio, estas en una oleada
 	            actualizar_cronometro(&oleada_actual, delta_tiempo);
-	            actualizar_enemigo1(enemigo1,tiempo_actual,&oleada_actual);
-		
-				// comprobacion de colicion entre disparos y enemigos
-				for (i = 0; i < MAX_DISPAROS; i++) {
-        	    	if (disparos[i].activo) {
-	        	        SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
-    	        	    SDL_RenderCopy(renderer, balaTextura, NULL, &rect_disparo);
-						//comprobacion de interseccion entre enemigos tipo 1 y la bala
-						for (j=0; j<MAX_ENEMIGOS;j++){
-							if (enemigo1[j].activo) {
-								SDL_Rect enemigo1Rect = {enemigo1[j].x + 15, enemigo1[j].y + 20, 40, 40};
-								if (SDL_HasIntersection(&rect_disparo,&enemigo1Rect)){
-									enemigo1[j].vida-=1;
-									disparos[i].activo = 0;
-									if (enemigo1[j].vida <= 0){
-										enemigo1[j].activo = 0;
-    	                				enemigo1[j].tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;
-        	            				// Generar moneda en la posición del enemigo muerto
-										generar_moneda(monedas, enemigo1[j].x, enemigo1[j].y);	
-										oleada_actual.enemigos_activos--;
-									}
-								}
-							}
-						}
-    	        	}
-        		}
-			
+	            actualizar_enemigo1(enemigo1,tiempo_actual,&oleada_actual);			
 				// aqui iran las acciones de interseccion entre enemigos contra el jugador
 				
 				SDL_Rect jugadorHitbox = {player.x + 10, player.y + 20, 40, 40};
@@ -1097,7 +1072,57 @@ int main(int argc, char *argv[]) {
 		    } else if (oleada_actual.momento_dia == 4) {
 		        SDL_RenderCopy(renderer, fondoAtardecerTextura, NULL, NULL);
 	    	}
-	    
+	    	
+	    	//renderizado y comprobacion de disparos
+			for (i = 0; i < MAX_DISPAROS; i++) {
+				    if (disparos[i].activo) {
+				    	
+
+				        SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
+				        SDL_RenderCopy(renderer, balaTextura, NULL, &rect_disparo);
+				        printf("renderizo la bala");
+				    }
+				}
+		
+				// comprobacion de colicion entre disparos y enemigos
+				for (i = 0; i < MAX_DISPAROS; i++) {
+				    if (disparos[i].activo) {
+				        // Mover la bala
+				        disparos[i].x += disparos[i].direccion_x * VELOCIDAD_DISPARO;
+				    
+				        // Verificar si la bala sale de la pantalla
+				        if (disparos[i].x < 0 , disparos[i].x > 1280  ) {
+				            disparos[i].activo = 0; // Desactivar la bala
+				        }
+				
+				        // Verificar colisiones con enemigos
+				        SDL_Rect rect_disparo = {disparos[i].x, disparos[i].y, disparos[i].ancho, disparos[i].alto};
+				        for (j = 0; j < MAX_ENEMIGOS; j++) {
+				            if (enemigo1[j].activo) {
+				                SDL_Rect enemigo1Rect = {enemigo1[j].x + 15, enemigo1[j].y + 20, 40, 40};
+				                if (SDL_HasIntersection(&rect_disparo, &enemigo1Rect)) {
+				                    enemigo1[j].vida -= 1;
+				                    disparos[i].activo = 0; // Desactivar la bala tras la colisión
+				                    if (enemigo1[j].vida <= 0) {
+				                        enemigo1[j].activo = 0;
+				                        enemigo1[j].tiempoReaparicion = tiempo_actual + TIEMPO_REAPARICION_ENEMIGO;
+				                        generar_moneda(monedas, enemigo1[j].x, enemigo1[j].y);
+				                        oleada_actual.enemigos_activos--;
+				                    }
+				                }
+				            }
+				        }
+				    }
+				}
+				
+			renderizar_defensa(renderer, &barricada, textura_defensa_construida, textura_defensa_destruida);
+			// renderizar rectangulo qeu contendra la textura del vehiculo
+			SDL_Rect vehiculoRect = {vehiculo.x, vehiculo.y, vehiculo.ancho, vehiculo.alto};
+			// copiar textura en el rectangulo del vehiculo y renderizarlo
+	 		SDL_RenderCopy(renderer, vehiculoTextura, NULL, &vehiculoRect);
+ 			//verificamos colicion de enemigos con vehiculo
+	 		detectar_colision_vehiculo(vehiculoRect, &vehiculo, enemigo1,&game_over);
+				
         	// Actualización de posición del rectángulo de representación
 			jugador.x = player.x;
 			jugador.y = player.y;
@@ -1170,6 +1195,10 @@ int main(int argc, char *argv[]) {
     	            }
         	    }
         	}
+        	
+        	if(oleada_actual.tiempo_transicion <=0){
+				mostrarMatriz=0;
+			}
   		
   			// mostar dinero con sdl_ttf
 	  		// se define y convierte a caracter o string lo que se quiera mostrar OBLIGADAMENTE
@@ -1191,15 +1220,14 @@ int main(int argc, char *argv[]) {
 	        SDL_RenderCopy(renderer, texturaTexto, NULL, &rectTexto);
     	    SDL_DestroyTexture(texturaTexto);
     	
-	    	// renderizar rectangulo qeu contendra la textura del vehiculo
-			SDL_Rect vehiculoRect = {vehiculo.x, vehiculo.y, vehiculo.ancho, vehiculo.alto};
-			// copiar textura en el rectangulo del vehiculo y renderizarlo
-	 		SDL_RenderCopy(renderer, vehiculoTextura, NULL, &vehiculoRect);
- 			//verificamos colicion de enemigos con vehiculo
-	 		detectar_colision_vehiculo(vehiculoRect, &vehiculo, enemigo1,&game_over);
-		
 			//renderizado de indicador de vida del vehiculo
 			renderizar_vida_vehiculo(renderer, &vehiculo);
+			
+			if (player.y >550){ //condicionales de limitaciones
+				player.y=550;
+			}else if(player.y<150){
+				player.y=150;
+			}
 		
 			//renderizado de botones para game over
 			if (game_over) {
@@ -1208,7 +1236,7 @@ int main(int argc, char *argv[]) {
 			}
         	mostrar_oleadas(renderer, fuente, oleada_actual.numero_oleada, oleada_actual.oleada_maxima);
 	  		mostrar_cronometro(renderer, fuente, &oleada_actual);
-  			renderizar_defensa(renderer, &barricada, textura_defensa_construida, textura_defensa_destruida);
+  			
 		
   		
 			SDL_RenderPresent(renderer);
