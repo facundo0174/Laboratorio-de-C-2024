@@ -517,6 +517,36 @@ void condicion_fin (Vehiculo *vehiculo, Jugador *player, int *game_over, Oleada 
 	}
 }
 
+void intruccion(){
+	MessageBox(
+        NULL, 
+        "Bienvenido al juego!\n\n"
+        "Esto es un juego Survival donde deberas sobrevivir oleadas\n"
+        "Debes reparar el vehiculo para ganar\n\n"
+        "Instrucciones:\n"
+        "- Usa las W,A,S,D para moverte.\n"
+        "- Presiona 'j' para disparar.\n"
+        "- Presiona 't' para abrir la tienda.\n"
+        "- ¡¡OJO, la tienda solo puedes acceder en el atardecer o amanecer!!.\n"
+        "- Compra el 'MARTILLO' para realizar BARRICADAS o REPARARLAS.\n"
+        "- Compra la 'LLAVE' para REPARAR el VEHICULO.\n"
+        "- Compra la 'HAMBURGUESA' para RECUPERAR salud.\n"
+        "- El juego terminara cuando el vehiculo este completamente reparado (vida=10) y estes en el atardecer o anochecer\n\n"        
+        "- DEPURACION.\n\n"
+        "- K = quitar salud.\n"
+        "- L = quitar salud.\n"
+        "- M = agrear salud.\n"
+        "- N = generar/quitar barricada.\n"
+        "- B = agregar salud vehiculo.\n"
+        "- V = agregar DINERO.\n\n"
+        
+        
+        "¡Presiona OK para comenzar!", 
+        "Instrucciones del Juego", 
+        MB_OK | MB_ICONINFORMATION
+    );
+}
+
 int main(int argc, char *argv[]) {
 	Uint32 tiempo_inicio = SDL_GetTicks();
 	srand(time(NULL));  // Inicializar el generador de números aleatorios
@@ -783,7 +813,7 @@ int main(int argc, char *argv[]) {
 	int velocidad = 5; //velocidad traducida en 5 pixeles por bucle segun x accion de desplazamiento en cada eje
 	Disparo disparo = {0, 0, 6, 2, 0, 0}; // inicializamos la entidad disparo desactivada, los parametros son correspondientes y posicionales al struct
     int mostrarMatriz = 0; // variable utilizada para logica de la tienda
-    
+    intruccion();
     
     while (running) {
         // Procesar eventos
@@ -881,7 +911,7 @@ int main(int argc, char *argv[]) {
                             	}
                 			break;
                 	
-						case SDLK_k:// CURAR VIDA POR PROPOSITO DE DEPURACION Y EVOLUCION
+						case SDLK_m:// CURAR VIDA POR PROPOSITO DE DEPURACION Y EVOLUCION
     	            		if (player.salud < VIDA_DEFAULT) {
 							        player.salud++;
 							        printf("¡Jugador se curó! Vida actual: %d\n", player.salud);
@@ -891,11 +921,11 @@ int main(int argc, char *argv[]) {
 					    	}
 					    	break;
 					
-						case SDLK_l: //realizarce daño para proposito de depuracion
+						case SDLK_k: //realizarce daño para proposito de depuracion
 							recibir_dano(&player,&game_over);
 							break;
 					
-						case SDLK_m://depuracion de la defensa/barricada
+						case SDLK_n://depuracion de la defensa/barricada
 							reconstruir_defensa(&barricada);
 							break;
 						
@@ -907,7 +937,27 @@ int main(int argc, char *argv[]) {
 									printf("no puedes acceder en este momento del dia a la tienda \n");
 								}
 							break;
-                 
+						
+						case SDLK_b: // aumentar vida vehiculo
+							if (vehiculo.vida <10){
+								vehiculo.vida++;
+								printf("depuracion vida vehiculo ++ \n");
+							}else{
+								printf("depuracion vida vehiculo, no se puede aumentar mas la vida \n");
+							}
+							break;
+							
+						case SDLK_v://incrementar dinero						
+                 			player.dinero+=30;
+                 			printf("depuracion dinero+30 \n");
+                 			break;
+                 		
+                 		case SDLK_l: //decrementar salud vehiculo
+                 			if (vehiculo.vida >0){
+                 				vehiculo.vida--;
+                 				printf("depuracion vida vehiculo --");
+							 }
+							 break;
 	                }
             	}else if (evento.type == SDL_MOUSEBUTTONDOWN && mostrarMatriz){ // eventos de tienda
 					int x = evento.button.x;
