@@ -338,7 +338,7 @@ void mostrar_cronometro(SDL_Renderer *renderer, TTF_Font *fuente, Oleada *oleada
     // mostrar el  cronometro adecuado
     if (oleada_actual->en_transicion) {
         tiempo_mostrar = oleada_actual->tiempo_transicion;
-        snprintf(texto, sizeof(texto), "Descanzo: %d seg", tiempo_mostrar / 1000);
+        snprintf(texto, sizeof(texto), "Descanso: %d seg", tiempo_mostrar / 1000);
     } else {
         tiempo_mostrar = oleada_actual->tiempo_restante;
         snprintf(texto, sizeof(texto), "Oleada: %d seg", tiempo_mostrar / 1000);
